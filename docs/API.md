@@ -16,11 +16,11 @@ Authorization: Bearer <access_token>
 
 Tokens are issued by `POST /auth/register` and `POST /auth/login`.
 
-| Role | Access |
-|------|--------|
-| `user` | Search artisans, own auth profile |
+| Role      | Access                                         |
+| --------- | ---------------------------------------------- |
+| `user`    | Search artisans, own auth profile              |
 | `artisan` | Everything a user can do + own artisan profile |
-| `admin` | Admin dashboard endpoints |
+| `admin`   | Admin dashboard endpoints                      |
 
 ---
 
@@ -28,16 +28,16 @@ Tokens are issued by `POST /auth/register` and `POST /auth/login`.
 
 ### User registration
 
-1. `POST /auth/validate` — validate name, email, phone, address  
-2. `POST /auth/otp/send` — request OTP  
-3. `POST /auth/otp/verify` — verify OTP  
+1. `POST /auth/validate` — validate name, email, phone, address
+2. `POST /auth/otp/send` — request OTP
+3. `POST /auth/otp/verify` — verify OTP
 4. `POST /auth/register` — create account (`role` omitted or `"user"`)
 
 ### Artisan registration
 
-1. `POST /auth/validate` — validate name, email, phone, address  
-2. `POST /auth/otp/send` → `POST /auth/otp/verify`  
-3. `POST /auth/validate/identity` — NIN, BVN, photo (`multipart`) → save returned `photoUrl` if needed  
+1. `POST /auth/validate` — validate name, email, phone, address
+2. `POST /auth/otp/send` → `POST /auth/otp/verify`
+3. `POST /auth/validate/identity` — NIN, BVN, photo (`multipart`) → save returned `photoUrl` if needed
 4. `POST /auth/register` — `role: "artisan"` + `artisanProfile` + `photo` (`multipart`)
 
 ---
@@ -93,15 +93,15 @@ Validate user details before registration.
 
 **Body**
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| firstName | string | yes | 1–100 |
-| lastName | string | yes | 1–100 |
-| email | string | yes | unique |
-| phoneNumber | string | yes | 7–30, unique |
-| city | string | yes | |
-| state | string | yes | |
-| address | string | yes | |
+| Field       | Type   | Required | Notes        |
+| ----------- | ------ | -------- | ------------ |
+| firstName   | string | yes      | 1–100        |
+| lastName    | string | yes      | 1–100        |
+| email       | string | yes      | unique       |
+| phoneNumber | string | yes      | 7–30, unique |
+| city        | string | no       |              |
+| state       | string | no       |              |
+| address     | string | no       |              |
 
 **Response `200`**
 
@@ -129,11 +129,11 @@ Validate artisan NIN/BVN (format + uniqueness stub) and upload photo.
 **Auth:** Public  
 **Content-Type:** `multipart/form-data`
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| nin | string | yes | 11 digits, unique |
-| bvn | string | yes | 11 digits, unique |
-| photo | file | yes | jpg/jpeg/png/webp, max 5MB |
+| Field | Type   | Required | Notes                      |
+| ----- | ------ | -------- | -------------------------- |
+| nin   | string | yes      | 11 digits, unique          |
+| bvn   | string | yes      | 11 digits, unique          |
+| photo | file   | yes      | jpg/jpeg/png/webp, max 5MB |
 
 **Response `200`**
 
@@ -212,47 +212,47 @@ Verify phone OTP.
 
 Register a user or artisan. Returns access token.
 
-**Auth:** Public  
+**Auth:** Public
 
-- Regular user: `application/json` is fine  
+- Regular user: `application/json` is fine
 - Artisan: use `multipart/form-data` (required for `photo`)
 
 **Body (user)**
 
-| Field | Type | Required |
-|-------|------|----------|
-| firstName | string | yes |
-| lastName | string | yes |
-| email | string | yes |
-| phoneNumber | string | yes |
-| password | string | yes (min 8) |
-| city | string | no |
-| state | string | no |
-| address | string | no |
-| role | `"user"` \| `"artisan"` | no (default `user`) |
+| Field       | Type                    | Required            |
+| ----------- | ----------------------- | ------------------- |
+| firstName   | string                  | yes                 |
+| lastName    | string                  | yes                 |
+| email       | string                  | yes                 |
+| phoneNumber | string                  | yes                 |
+| password    | string                  | yes (min 8)         |
+| city        | string                  | no                  |
+| state       | string                  | no                  |
+| address     | string                  | no                  |
+| role        | `"user"` \| `"artisan"` | no (default `user`) |
 
 **Extra for artisan (`role: "artisan"`)**
 
-| Field | Type | Required | Notes |
-|-------|------|----------|-------|
-| photo | file | yes | multipart only |
-| artisanProfile[trade] | string | yes | |
-| artisanProfile[nin] | string | yes | 11 digits |
-| artisanProfile[bvn] | string | yes | 11 digits |
-| artisanProfile[businessName] | string | no | |
-| artisanProfile[bio] | string | no | |
-| artisanProfile[yearsOfExperience] | number | no | |
-| artisanProfile[city] | string | no | |
-| artisanProfile[state] | string | no | |
-| artisanProfile[address] | string | no | |
-| artisanProfile[serviceRadiusKm] | number | no | |
-| artisanProfile[verificationDocumentUrl] | string | no | URL |
-| artisanProfile[guarantor][fullName] | string | no* | required if guarantor sent |
-| artisanProfile[guarantor][email] | string | no* | |
-| artisanProfile[guarantor][phoneNumber] | string | no* | |
-| artisanProfile[guarantor][city] | string | no* | |
-| artisanProfile[guarantor][state] | string | no* | |
-| artisanProfile[guarantor][address] | string | no* | |
+| Field                                   | Type   | Required | Notes                      |
+| --------------------------------------- | ------ | -------- | -------------------------- |
+| photo                                   | file   | yes      | multipart only             |
+| artisanProfile[trade]                   | string | yes      |                            |
+| artisanProfile[nin]                     | string | yes      | 11 digits                  |
+| artisanProfile[bvn]                     | string | yes      | 11 digits                  |
+| artisanProfile[businessName]            | string | no       |                            |
+| artisanProfile[bio]                     | string | no       |                            |
+| artisanProfile[yearsOfExperience]       | number | no       |                            |
+| artisanProfile[city]                    | string | no       |                            |
+| artisanProfile[state]                   | string | no       |                            |
+| artisanProfile[address]                 | string | no       |                            |
+| artisanProfile[serviceRadiusKm]         | number | no       |                            |
+| artisanProfile[verificationDocumentUrl] | string | no       | URL                        |
+| artisanProfile[guarantor][fullName]     | string | no*      | required if guarantor sent |
+| artisanProfile[guarantor][email]        | string | no*      |                            |
+| artisanProfile[guarantor][phoneNumber]  | string | no*      |                            |
+| artisanProfile[guarantor][city]         | string | no*      |                            |
+| artisanProfile[guarantor][state]        | string | no*      |                            |
+| artisanProfile[guarantor][address]      | string | no*      |                            |
 
 For JSON clients registering artisans, nested objects work when fields are sent as nested form keys, e.g. `artisanProfile[guarantor][fullName]`.
 
@@ -294,8 +294,9 @@ For JSON clients registering artisans, nested objects work when fields are sent 
 ```
 
 Notes:
-- `password` is never returned  
-- `bvn` is never returned on artisan profile  
+
+- `password` is never returned
+- `bvn` is never returned on artisan profile
 
 Store `value` and send it as `Authorization: Bearer <value>`.
 
@@ -319,7 +320,7 @@ Store `value` and send it as `Authorization: Bearer <value>`.
 
 #### `POST /auth/logout`
 
-**Auth:** Bearer token  
+**Auth:** Bearer token
 
 **Response `200`**
 
@@ -331,7 +332,7 @@ Store `value` and send it as `Authorization: Bearer <value>`.
 
 #### `GET /auth/me`
 
-**Auth:** Bearer token  
+**Auth:** Bearer token
 
 **Response `200`**
 
@@ -349,14 +350,14 @@ Store `value` and send it as `Authorization: Bearer <value>`.
 
 Search verified, available artisans.
 
-**Auth:** Public  
+**Auth:** Public
 
-| Query | Type | Default | Notes |
-|-------|------|---------|-------|
-| page | number | 1 | |
-| limit | number | 20 | max 50 |
-| trade | string | — | partial match |
-| city | string | — | partial match |
+| Query | Type   | Default | Notes         |
+| ----- | ------ | ------- | ------------- |
+| page  | number | 1       |               |
+| limit | number | 20      | max 50        |
+| trade | string | —       | partial match |
+| city  | string | —       | partial match |
 
 **Response `200`** — Lucid pagination payload (`meta` + `data`).
 
@@ -366,7 +367,7 @@ Search verified, available artisans.
 
 Public artisan profile (approved only).
 
-**Auth:** Public  
+**Auth:** Public
 
 **Response `200`**
 
@@ -416,27 +417,27 @@ Update own artisan profile. Supports optional photo replace.
 
 All fields optional:
 
-| Field | Type |
-|-------|------|
-| trade | string |
-| businessName | string \| null |
-| bio | string \| null |
-| yearsOfExperience | number |
-| city | string \| null |
-| state | string \| null |
-| address | string \| null |
-| serviceRadiusKm | number \| null |
-| isAvailable | boolean |
-| nin | string |
-| bvn | string |
+| Field                   | Type           |
+| ----------------------- | -------------- |
+| trade                   | string         |
+| businessName            | string \| null |
+| bio                     | string \| null |
+| yearsOfExperience       | number         |
+| city                    | string \| null |
+| state                   | string \| null |
+| address                 | string \| null |
+| serviceRadiusKm         | number \| null |
+| isAvailable             | boolean        |
+| nin                     | string         |
+| bvn                     | string         |
 | verificationDocumentUrl | string \| null |
-| guarantorFullName | string \| null |
-| guarantorEmail | string \| null |
-| guarantorPhoneNumber | string \| null |
-| guarantorCity | string \| null |
-| guarantorState | string \| null |
-| guarantorAddress | string \| null |
-| photo | file | optional replacement |
+| guarantorFullName       | string \| null |
+| guarantorEmail          | string \| null |
+| guarantorPhoneNumber    | string \| null |
+| guarantorCity           | string \| null |
+| guarantorState          | string \| null |
+| guarantorAddress        | string \| null |
+| photo                   | file           | optional replacement |
 
 **Response `200`**
 
@@ -452,11 +453,11 @@ All require **Bearer + role `admin`**.
 
 #### `GET /admin/users`
 
-| Query | Notes |
-|-------|-------|
-| page | default 1 |
-| limit | default 20, max 100 |
-| role | optional: `user` \| `artisan` \| `admin` |
+| Query | Notes                                    |
+| ----- | ---------------------------------------- |
+| page  | default 1                                |
+| limit | default 20, max 100                      |
+| role  | optional: `user` \| `artisan` \| `admin` |
 
 ---
 
@@ -482,10 +483,10 @@ All require **Bearer + role `admin`**.
 
 #### `GET /admin/artisans`
 
-| Query | Notes |
-|-------|-------|
-| page | |
-| limit | |
+| Query              | Notes                                 |
+| ------------------ | ------------------------------------- |
+| page               |                                       |
+| limit              |                                       |
 | verificationStatus | `pending` \| `approved` \| `rejected` |
 
 ---

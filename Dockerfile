@@ -23,7 +23,7 @@ FROM deps AS development
 ENV NODE_ENV=development
 COPY . .
 EXPOSE 3333
-CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
+CMD ["npm", "run", "dev"]
 
 ############################################
 # Test
