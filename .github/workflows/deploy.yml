@@ -88,7 +88,7 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script_stop: true
           script: |
@@ -113,7 +113,7 @@ jobs:
           remote_path: /usr/local/apps/Beta-work/
           remote_host: ${{ secrets.SSH_HOST }}
           remote_user: ${{ secrets.SSH_USERNAME }}
-          remote_pass: ${{ secrets.SSH_PASSWORD }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
           remote_port: 22
 
       - name: Deploy containers
@@ -121,7 +121,7 @@ jobs:
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USERNAME }}
-          password: ${{ secrets.SSH_PASSWORD }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script_stop: true
           script: |

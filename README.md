@@ -77,18 +77,20 @@ Pushing to `main` runs tests, then deploys the production Docker stack to `162.0
 
 Create a GitHub **production** environment and add these secrets:
 
-| Secret         | Description                |
-| -------------- | -------------------------- |
-| `SSH_USER`     | SSH username on the server |
-| `SSH_PASSWORD` | SSH password for that user |
+| Secret            | Description                        |
+| ----------------- | ---------------------------------- |
+| `SSH_HOST`        | Server host (e.g. `162.0.236.252`) |
+| `SSH_USERNAME`    | SSH username on the server         |
+| `SSH_PRIVATE_KEY` | Private key for SSH access         |
 
-Deploy target: `162.0.236.252:/usr/local/Beta-work` (SSH port `22`).
+Deploy target: `/usr/local/apps/Beta-work` (SSH port `22`).
 
 On the server, one-time setup:
 
 1. Install Docker + Docker Compose plugin
-2. Ensure `/usr/local/Beta-work` exists with a production `.env` (`APP_KEY`, DB/Redis values, etc.)
-3. Ensure the SSH user can run `docker` (e.g. in the `docker` group)
+2. Add the matching public key to the SSH user's `authorized_keys`
+3. Ensure a production `.env` exists at `/usr/local/apps/Beta-work/.env` (`APP_KEY`, DB/Redis values, etc.)
+4. Ensure the SSH user can run `docker` (e.g. in the `docker` group)
 
 You can also trigger deploy manually from the **Actions → Deploy Production → Run workflow** button.
 
