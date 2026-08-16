@@ -11,6 +11,9 @@ export default class extends BaseSchema {
       table.string('email', 254).notNullable().unique()
       table.string('phone_number', 30).notNullable().unique()
       table.string('password').notNullable()
+      table.string('city').nullable()
+      table.string('state').nullable()
+      table.string('address').nullable()
       table
         .enum('role', ['user', 'artisan', 'admin'], {
           useNative: true,

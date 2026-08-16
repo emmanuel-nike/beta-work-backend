@@ -1,0 +1,53 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER:-betawork}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-betawork}
+      POSTGRES_DB: ${DB_DATABASE:-betawork}
+    volumes:
+      - betawork_pg_prod:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-betawork} -d ${DB_DATABASE:-betawork}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      target: production
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      DB_HOST: postgres
+      REDIS_HOST: redis
+    ports:
+      - '${PORT:-3333}:3333'
+    volumes:
+      - betawork_uploads_prod:/app/storage/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: >
+      sh -c "node ace.js migration:run --force &&
+             node bin/server.js"
+    restart: unless-stopped
+
+volumes:
+  betawork_pg_prod:
+  betawork_uploads_prod:

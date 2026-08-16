@@ -25,6 +25,10 @@ router.get('/', async () => {
 
 router
   .group(() => {
+    router.post('/auth/validate', [AuthController, 'validateRegistration'])
+    router.post('/auth/validate/identity', [AuthController, 'validateIdentity'])
+    router.post('/auth/otp/send', [AuthController, 'sendOtp'])
+    router.post('/auth/otp/verify', [AuthController, 'verifyOtp'])
     router.post('/auth/register', [AuthController, 'register'])
     router.post('/auth/login', [AuthController, 'login'])
 
@@ -56,5 +60,6 @@ router
 
     router.get('/artisans', [ArtisanProfilesController, 'index'])
     router.get('/artisans/:id', [ArtisanProfilesController, 'show'])
+    router.get('/uploads/artisans/:fileName', [ArtisanProfilesController, 'photo'])
   })
   .prefix('/api/v1')

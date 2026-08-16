@@ -39,6 +39,33 @@ export default class ArtisanProfile extends BaseModel {
   declare isAvailable: boolean
 
   @column()
+  declare nin: string
+
+  @column()
+  declare bvn: string
+
+  @column()
+  declare photoUrl: string
+
+  @column()
+  declare guarantorFullName: string | null
+
+  @column()
+  declare guarantorEmail: string | null
+
+  @column()
+  declare guarantorPhoneNumber: string | null
+
+  @column()
+  declare guarantorCity: string | null
+
+  @column()
+  declare guarantorState: string | null
+
+  @column()
+  declare guarantorAddress: string | null
+
+  @column()
   declare verificationStatus: VerificationStatus
 
   @column()

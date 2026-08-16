@@ -10,17 +10,17 @@ storage/uploads
 .env.production.local
 .env.development.local
 
-# Frontend assets compiled code
-public/assets
-
-# Build tools specific
-npm-debug.log
-yarn-error.log
-
-# Editors specific
+# Git / IDE
+.git
+.github
 .fleet
 .idea
 .vscode
 
-# Platform specific
+# Docs / misc
+*.md
+docs
+npm-debug.log
+yarn-error.log
 .DS_Store
+coverage

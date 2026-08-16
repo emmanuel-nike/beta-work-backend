@@ -1,7 +1,9 @@
+import { unlink } from 'node:fs/promises'
 import type { HttpContext } from '@adonisjs/core/http'
 import cache from '@adonisjs/cache/services/main'
 import VerificationStatus from '#enums/verification_status'
 import ArtisanProfile from '#models/artisan_profile'
+import LocalPhotoService from '#services/local_photo_service'
 import { updateArtisanProfileValidator } from '#validators/artisan_profile'
 
 export default class ArtisanProfilesController {
@@ -83,11 +85,54 @@ export default class ArtisanProfilesController {
     }
 
     const payload = await request.validateUsing(updateArtisanProfileValidator)
+    const photo = request.file('photo', {
+      size: LocalPhotoService.MAX_SIZE,
+      extnames: [...LocalPhotoService.EXTNAMES],
+    })
+
+    if (photo) {
+      if (!photo.isValid) {
+        return response.unprocessableEntity({
+          message: photo.errors[0]?.message ?? 'Invalid photo upload',
+          errors: photo.errors,
+        })
+      }
+
+      const previousPhotoUrl = user.artisanProfile.photoUrl
+
+      try {
+        user.artisanProfile.photoUrl = await LocalPhotoService.storeArtisanPhoto(photo)
+      } catch (error) {
+        return response.badRequest({
+          message: error instanceof Error ? error.message : 'Unable to store photo',
+        })
+      }
+
+      if (previousPhotoUrl) {
+        await unlink(LocalPhotoService.absolutePathFromUrl(previousPhotoUrl)).catch(() => {})
+      }
+    }
+
     user.artisanProfile.merge(payload)
     await user.artisanProfile.save()
-
     await cache.clear()
 
     return response.ok({ artisanProfile: user.artisanProfile.serialize() })
+  }
+
+  /**
+   * Stream a locally stored artisan photo.
+   */
+  async photo({ params, response }: HttpContext) {
+    const fileName = params.fileName
+
+    if (!fileName || fileName.includes('..') || fileName.includes('/') || fileName.includes('\\')) {
+      return response.badRequest({ message: 'Invalid file name' })
+    }
+
+    const relativePath = `storage/uploads/artisans/${fileName}`
+    const absolutePath = LocalPhotoService.absolutePath(relativePath)
+
+    return response.download(absolutePath)
   }
 }

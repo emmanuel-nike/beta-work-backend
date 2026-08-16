@@ -33,6 +33,15 @@ export default class User extends compose(BaseModel, AuthFinder) {
   declare password: string
 
   @column()
+  declare city: string | null
+
+  @column()
+  declare state: string | null
+
+  @column()
+  declare address: string | null
+
+  @column()
   declare role: UserRole
 
   @column.dateTime({ autoCreate: true })

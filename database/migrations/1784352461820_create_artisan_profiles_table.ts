@@ -26,6 +26,19 @@ export default class extends BaseSchema {
       table.decimal('service_radius_km', 8, 2).nullable()
       table.boolean('is_available').notNullable().defaultTo(true)
 
+      // Identity / verification documents
+      table.string('nin', 20).nullable().unique()
+      table.string('bvn', 11).nullable().unique()
+      table.string('photo_url').notNullable()
+
+      // Guarantor details
+      table.string('guarantor_full_name').nullable()
+      table.string('guarantor_email', 254).nullable()
+      table.string('guarantor_phone_number', 30).nullable()
+      table.string('guarantor_city').nullable()
+      table.string('guarantor_state').nullable()
+      table.string('guarantor_address').nullable()
+
       // Verification details
       table
         .enum('verification_status', ['pending', 'approved', 'rejected'], {

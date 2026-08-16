@@ -1,0 +1,826 @@
+openapi: 3.0.3
+info:
+  title: BetaWork API
+  version: 1.0.0
+  description: |
+    Backend API for the BetaWork mobile application.
+    Authenticate with opaque access tokens (`Authorization: Bearer <token>`).
+servers:
+  - url: http://localhost:3333/api/v1
+    description: Local development
+tags:
+  - name: Auth
+  - name: Artisans
+  - name: Artisan Profile
+  - name: Admin
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: opaque
+  schemas:
+    ErrorMessage:
+      type: object
+      properties:
+        message:
+          type: string
+    ValidationError:
+      type: object
+      properties:
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              message:
+                type: string
+              rule:
+                type: string
+              field:
+                type: string
+    UserRole:
+      type: string
+      enum: [user, artisan, admin]
+    VerificationStatus:
+      type: string
+      enum: [pending, approved, rejected]
+    Guarantor:
+      type: object
+      required: [fullName, email, phoneNumber, city, state, address]
+      properties:
+        fullName:
+          type: string
+        email:
+          type: string
+          format: email
+        phoneNumber:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        address:
+          type: string
+    ArtisanProfileInput:
+      type: object
+      required: [trade, nin, bvn]
+      properties:
+        trade:
+          type: string
+        businessName:
+          type: string
+        bio:
+          type: string
+        yearsOfExperience:
+          type: number
+        city:
+          type: string
+        state:
+          type: string
+        address:
+          type: string
+        serviceRadiusKm:
+          type: number
+        nin:
+          type: string
+          pattern: '^\d{11}$'
+        bvn:
+          type: string
+          pattern: '^\d{11}$'
+        verificationDocumentUrl:
+          type: string
+          format: uri
+        guarantor:
+          $ref: '#/components/schemas/Guarantor'
+    ArtisanProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: integer
+        trade:
+          type: string
+        businessName:
+          type: string
+          nullable: true
+        bio:
+          type: string
+          nullable: true
+        yearsOfExperience:
+          type: integer
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        serviceRadiusKm:
+          type: number
+          nullable: true
+        isAvailable:
+          type: boolean
+        nin:
+          type: string
+        photoUrl:
+          type: string
+        verificationStatus:
+          $ref: '#/components/schemas/VerificationStatus'
+        guarantorFullName:
+          type: string
+          nullable: true
+        guarantorEmail:
+          type: string
+          nullable: true
+        guarantorPhoneNumber:
+          type: string
+          nullable: true
+        guarantorCity:
+          type: string
+          nullable: true
+        guarantorState:
+          type: string
+          nullable: true
+        guarantorAddress:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+        firstName:
+          type: string
+        lastName:
+          type: string
+        email:
+          type: string
+        phoneNumber:
+          type: string
+        city:
+          type: string
+          nullable: true
+        state:
+          type: string
+          nullable: true
+        address:
+          type: string
+          nullable: true
+        role:
+          $ref: '#/components/schemas/UserRole'
+        artisanProfile:
+          allOf:
+            - $ref: '#/components/schemas/ArtisanProfile'
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+          nullable: true
+    AuthTokenResponse:
+      type: object
+      properties:
+        type:
+          type: string
+          example: bearer
+        value:
+          type: string
+          description: Access token to send as Bearer token
+        expiresAt:
+          type: string
+          format: date-time
+          nullable: true
+        user:
+          $ref: '#/components/schemas/User'
+paths:
+  /auth/validate:
+    post:
+      tags: [Auth]
+      summary: Validate registration details
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, email, phoneNumber, city, state, address]
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phoneNumber:
+                  type: string
+                city:
+                  type: string
+                state:
+                  type: string
+                address:
+                  type: string
+      responses:
+        '200':
+          description: Details are valid
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  data:
+                    type: object
+        '422':
+          description: Validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+
+  /auth/validate/identity:
+    post:
+      tags: [Auth]
+      summary: Validate NIN, BVN, and photo
+      description: Stub validation (format + uniqueness). Stores photo and returns photoUrl.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [nin, bvn, photo]
+              properties:
+                nin:
+                  type: string
+                  pattern: '^\d{11}$'
+                bvn:
+                  type: string
+                  pattern: '^\d{11}$'
+                photo:
+                  type: string
+                  format: binary
+                  description: jpg/jpeg/png/webp, max 5MB
+      responses:
+        '200':
+          description: Identity accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  verified:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      nin:
+                        type: string
+                      bvn:
+                        type: string
+                      photoUrl:
+                        type: string
+        '422':
+          description: Invalid input or photo
+
+  /auth/otp/send:
+    post:
+      tags: [Auth]
+      summary: Send phone OTP (dummy)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber]
+              properties:
+                phoneNumber:
+                  type: string
+      responses:
+        '200':
+          description: OTP generated (returned in body for now)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  phoneNumber:
+                    type: string
+                  otp:
+                    type: string
+                    example: '483920'
+
+  /auth/otp/verify:
+    post:
+      tags: [Auth]
+      summary: Verify phone OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phoneNumber, otp]
+              properties:
+                phoneNumber:
+                  type: string
+                otp:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+      responses:
+        '200':
+          description: Phone verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  phoneNumber:
+                    type: string
+                  verified:
+                    type: boolean
+        '422':
+          description: Invalid or expired OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register user or artisan
+      description: |
+        For artisans use multipart/form-data and include `photo` plus nested
+        `artisanProfile[...]` fields. Regular users may use JSON.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, email, phoneNumber, password]
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                phoneNumber:
+                  type: string
+                password:
+                  type: string
+                  minLength: 8
+                city:
+                  type: string
+                state:
+                  type: string
+                address:
+                  type: string
+                role:
+                  type: string
+                  enum: [user, artisan]
+                artisanProfile:
+                  $ref: '#/components/schemas/ArtisanProfileInput'
+          multipart/form-data:
+            schema:
+              type: object
+              required: [firstName, lastName, email, phoneNumber, password]
+              properties:
+                firstName:
+                  type: string
+                lastName:
+                  type: string
+                email:
+                  type: string
+                phoneNumber:
+                  type: string
+                password:
+                  type: string
+                city:
+                  type: string
+                state:
+                  type: string
+                address:
+                  type: string
+                role:
+                  type: string
+                  enum: [user, artisan]
+                photo:
+                  type: string
+                  format: binary
+                artisanProfile:
+                  $ref: '#/components/schemas/ArtisanProfileInput'
+      responses:
+        '201':
+          description: Registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '422':
+          description: Validation failed
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthTokenResponse'
+        '400':
+          description: Invalid credentials
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout (revoke current token)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logged out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+        '401':
+          description: Unauthorized
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Current authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+
+  /artisans:
+    get:
+      tags: [Artisans]
+      summary: Search approved artisans
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+            maximum: 50
+        - in: query
+          name: trade
+          schema:
+            type: string
+        - in: query
+          name: city
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Paginated artisan list
+
+  /artisans/{id}:
+    get:
+      tags: [Artisans]
+      summary: Get approved artisan by id
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Artisan profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artisanProfile:
+                    $ref: '#/components/schemas/ArtisanProfile'
+        '404':
+          description: Not found
+
+  /uploads/artisans/{fileName}:
+    get:
+      tags: [Artisans]
+      summary: Download artisan photo
+      parameters:
+        - in: path
+          name: fileName
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Image file
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+
+  /artisan/profile:
+    get:
+      tags: [Artisan Profile]
+      summary: Get own artisan profile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Own profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artisanProfile:
+                    $ref: '#/components/schemas/ArtisanProfile'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden (not an artisan)
+    put:
+      tags: [Artisan Profile]
+      summary: Update own artisan profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                trade:
+                  type: string
+                businessName:
+                  type: string
+                  nullable: true
+                bio:
+                  type: string
+                  nullable: true
+                yearsOfExperience:
+                  type: number
+                city:
+                  type: string
+                  nullable: true
+                state:
+                  type: string
+                  nullable: true
+                address:
+                  type: string
+                  nullable: true
+                serviceRadiusKm:
+                  type: number
+                  nullable: true
+                isAvailable:
+                  type: boolean
+                nin:
+                  type: string
+                bvn:
+                  type: string
+                verificationDocumentUrl:
+                  type: string
+                  nullable: true
+                guarantorFullName:
+                  type: string
+                  nullable: true
+                guarantorEmail:
+                  type: string
+                  nullable: true
+                guarantorPhoneNumber:
+                  type: string
+                  nullable: true
+                guarantorCity:
+                  type: string
+                  nullable: true
+                guarantorState:
+                  type: string
+                  nullable: true
+                guarantorAddress:
+                  type: string
+                  nullable: true
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                trade:
+                  type: string
+                photo:
+                  type: string
+                  format: binary
+                guarantorFullName:
+                  type: string
+                guarantorEmail:
+                  type: string
+                guarantorPhoneNumber:
+                  type: string
+                guarantorCity:
+                  type: string
+                guarantorState:
+                  type: string
+                guarantorAddress:
+                  type: string
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artisanProfile:
+                    $ref: '#/components/schemas/ArtisanProfile'
+        '403':
+          description: Forbidden
+
+  /admin/users:
+    get:
+      tags: [Admin]
+      summary: List users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            maximum: 100
+        - in: query
+          name: role
+          schema:
+            $ref: '#/components/schemas/UserRole'
+      responses:
+        '200':
+          description: Paginated users
+        '403':
+          description: Forbidden
+
+  /admin/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get user by id
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:
+                    $ref: '#/components/schemas/User'
+
+  /admin/users/{id}/role:
+    patch:
+      tags: [Admin]
+      summary: Update user role
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  $ref: '#/components/schemas/UserRole'
+      responses:
+        '200':
+          description: Role updated
+
+  /admin/artisans:
+    get:
+      tags: [Admin]
+      summary: List artisan profiles
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+        - in: query
+          name: limit
+          schema:
+            type: integer
+        - in: query
+          name: verificationStatus
+          schema:
+            $ref: '#/components/schemas/VerificationStatus'
+      responses:
+        '200':
+          description: Paginated artisans
+
+  /admin/artisans/{id}/verification:
+    patch:
+      tags: [Admin]
+      summary: Approve/reject artisan verification
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [verificationStatus]
+              properties:
+                verificationStatus:
+                  $ref: '#/components/schemas/VerificationStatus'
+                verificationNotes:
+                  type: string
+                  nullable: true
+      responses:
+        '200':
+          description: Verification updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  artisanProfile:
+                    $ref: '#/components/schemas/ArtisanProfile'
