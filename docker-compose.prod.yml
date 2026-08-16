@@ -41,11 +41,12 @@ services:
     environment:
       NODE_ENV: production
       HOST: 0.0.0.0
+      PORT: 3333
       DB_HOST: postgres
       REDIS_HOST: redis
 
     ports:
-      - "${PORT:-3333}:3333"
+      - "4444:3333"
 
     volumes:
       - betawork_uploads_prod:/app/storage/uploads

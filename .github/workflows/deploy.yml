@@ -173,9 +173,8 @@ jobs:
             echo "Container status:"
             docker compose -f "$COMPOSE_FILE" ps
 
-            # Load only the PORT value from .env.
-            APP_PORT=$(grep -E '^PORT=' .env | tail -1 | cut -d '=' -f2- || true)
-            APP_PORT="${APP_PORT:-3333}"
+            # Host-mapped production port (container still listens on 3333).
+            APP_PORT=4444
 
             echo "Checking API on port ${APP_PORT}..."
 
