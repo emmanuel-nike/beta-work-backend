@@ -1,0 +1,222 @@
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: betawork
+          POSTGRES_PASSWORD: betawork
+          POSTGRES_DB: betawork_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U betawork -d betawork_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        env:
+          NODE_ENV: test
+          HOST: 0.0.0.0
+          PORT: 3333
+          LOG_LEVEL: error
+          APP_KEY: averylongtestappkeyforbetawork123
+
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_USER: betawork
+          DB_PASSWORD: betawork
+          DB_DATABASE: betawork_test
+
+          REDIS_HOST: 127.0.0.1
+          REDIS_PORT: 6379
+          REDIS_PASSWORD: ""
+
+        run: npm test
+
+  deploy:
+    name: Deploy Production
+    runs-on: ubuntu-latest
+    needs: test
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure deploy directory exists
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          script_stop: true
+          script: |
+            set -e
+
+            mkdir -p /usr/local/apps/Beta-work
+
+      - name: Sync application files
+        uses: burnett01/rsync-deployments@7.0.2
+        with:
+          switches: >-
+            -avzr
+            --delete
+            --exclude=node_modules
+            --exclude=.git
+            --exclude=.github
+            --exclude=tmp
+            --exclude=storage/uploads
+            --exclude=.env
+            --exclude=.env.test
+          path: ./
+          remote_path: /usr/local/apps/Beta-work/
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_user: ${{ secrets.SSH_USERNAME }}
+          remote_pass: ${{ secrets.SSH_PASSWORD }}
+          remote_port: 22
+
+      - name: Deploy containers
+        uses: appleboy/ssh-action@v1.2.2
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USERNAME }}
+          password: ${{ secrets.SSH_PASSWORD }}
+          port: 22
+          script_stop: true
+          script: |
+            set -e
+
+            APP_DIR="/usr/local/apps/Beta-work"
+            COMPOSE_FILE="docker-compose.prod.yml"
+
+            cd "$APP_DIR"
+
+            if [ ! -f "$COMPOSE_FILE" ]; then
+              echo "ERROR: $COMPOSE_FILE not found"
+              exit 1
+            fi
+
+            if [ ! -f ".env" ]; then
+              echo "ERROR: $APP_DIR/.env does not exist"
+              exit 1
+            fi
+
+            echo "Checking Docker..."
+            docker version
+            docker compose version
+
+            echo "Pulling/building production images..."
+            docker compose -f "$COMPOSE_FILE" build --pull
+
+            echo "Starting production containers..."
+            docker compose -f "$COMPOSE_FILE" up -d --remove-orphans
+
+            echo "Waiting for containers to become healthy..."
+
+            for i in $(seq 1 30); do
+              if docker compose -f "$COMPOSE_FILE" ps | grep -q "Up"; then
+                echo "Containers are running"
+                break
+              fi
+
+              if [ "$i" -eq 30 ]; then
+                echo "ERROR: Containers did not start"
+                docker compose -f "$COMPOSE_FILE" ps
+                docker compose -f "$COMPOSE_FILE" logs --tail=100
+                exit 1
+              fi
+
+              sleep 2
+            done
+
+            echo "Container status:"
+            docker compose -f "$COMPOSE_FILE" ps
+
+            # Load only the PORT value from .env.
+            APP_PORT=$(grep -E '^PORT=' .env | tail -1 | cut -d '=' -f2- || true)
+            APP_PORT="${APP_PORT:-3333}"
+
+            echo "Checking API on port ${APP_PORT}..."
+
+            for i in $(seq 1 30); do
+              if curl -fsS \
+                --connect-timeout 2 \
+                --max-time 5 \
+                "http://127.0.0.1:${APP_PORT}/" \
+                >/dev/null 2>&1; then
+
+                echo "API is healthy"
+
+                curl -fsS \
+                  --connect-timeout 2 \
+                  --max-time 5 \
+                  "http://127.0.0.1:${APP_PORT}/"
+
+                echo
+                echo "Deployment successful"
+
+                docker image prune -f
+
+                exit 0
+              fi
+
+              echo "API not ready yet... attempt ${i}/30"
+              sleep 2
+            done
+
+            echo "ERROR: API did not become ready"
+
+            echo
+            echo "=== Container Status ==="
+            docker compose -f "$COMPOSE_FILE" ps
+
+            echo
+            echo "=== API Logs ==="
+            docker compose -f "$COMPOSE_FILE" logs --tail=100 api
+
+            echo
+            echo "=== All Container Logs ==="
+            docker compose -f "$COMPOSE_FILE" logs --tail=50
+
+            exit 1
