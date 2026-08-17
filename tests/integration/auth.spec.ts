@@ -40,6 +40,26 @@ test.group('Auth API', (group) => {
     })
   })
 
+  test('POST /auth/validate allows missing city, state, and address', async ({ client }) => {
+    const payload = {
+      firstName: 'Ada',
+      lastName: 'Okeke',
+      email: uniqueEmail('validate-optional'),
+      phoneNumber: uniquePhone(),
+    }
+
+    const response = await client.post('/api/v1/auth/validate').json(payload)
+
+    response.assertStatus(200)
+    response.assertBodyContains({
+      message: 'User information is valid',
+      data: {
+        email: payload.email,
+        phoneNumber: payload.phoneNumber,
+      },
+    })
+  })
+
   test('POST /auth/otp/send and verify succeed', async ({ client }) => {
     const phoneNumber = uniquePhone()
 

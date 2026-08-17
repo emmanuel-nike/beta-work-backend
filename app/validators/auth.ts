@@ -77,9 +77,9 @@ export const validateRegistrationValidator = vine.compile(
       .minLength(7)
       .maxLength(30)
       .unique({ table: 'users', column: 'phone_number' }),
-    city: vine.string().trim().minLength(1).maxLength(100),
-    state: vine.string().trim().minLength(1).maxLength(100),
-    address: vine.string().trim().minLength(1).maxLength(255),
+    city: vine.string().trim().maxLength(100).optional(),
+    state: vine.string().trim().maxLength(100).optional(),
+    address: vine.string().trim().maxLength(255).optional(),
   })
 )
 
@@ -91,7 +91,7 @@ export const validateIdentityValidator = vine.compile(
     nin: vine
       .string()
       .trim()
-      .regex(/^\d{11}$/)
+      .regex(/^\d{10,15}$/)
       .unique({ table: 'artisan_profiles', column: 'nin' }),
     bvn: vine
       .string()

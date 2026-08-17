@@ -84,7 +84,7 @@ components:
           type: number
         nin:
           type: string
-          pattern: '^\d{11}$'
+          pattern: '^\d{10,15}$'
         bvn:
           type: string
           pattern: '^\d{11}$'
@@ -216,7 +216,7 @@ paths:
           application/json:
             schema:
               type: object
-              required: [firstName, lastName, email, phoneNumber, city, state, address]
+              required: [firstName, lastName, email, phoneNumber]
               properties:
                 firstName:
                   type: string
