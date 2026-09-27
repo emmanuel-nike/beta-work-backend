@@ -36,10 +36,13 @@ router
       .group(() => {
         router.post('/auth/logout', [AuthController, 'logout'])
         router.get('/auth/me', [AuthController, 'me'])
+        router.put('/auth/me', [AuthController, 'updateProfile'])
+        router.put('/auth/password', [AuthController, 'changePassword'])
 
         router
           .group(() => {
             router.get('/artisan/profile', [ArtisanProfilesController, 'mine'])
+            router.get('/artisan/status', [ArtisanProfilesController, 'status'])
             router.put('/artisan/profile', [ArtisanProfilesController, 'update'])
           })
           .use(middleware.role({ roles: [UserRole.ARTISAN] }))

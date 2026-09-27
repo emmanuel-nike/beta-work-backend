@@ -141,10 +141,12 @@ test.group('Artisan & Admin API', (group) => {
         artisanProfile: {
           trade: 'Carpenter',
           guarantorFullName: 'Guarantor Person',
+          verificationStatus: VerificationStatus.PENDING,
         },
       },
     })
     assert.match(response.body().user.artisanProfile.photoUrl, /^\/api\/v1\/uploads\/artisans\//)
+    assert.equal(response.body().user.artisanProfile.verificationStatus, 'pending')
   })
 })
 
