@@ -1,4 +1,5 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import hash from '@adonisjs/core/services/hash'
 import cache from '@adonisjs/cache/services/main'
 import db from '@adonisjs/lucid/services/db'
 import UserRole from '#enums/user_role'
@@ -7,9 +8,11 @@ import ArtisanProfile from '#models/artisan_profile'
 import LocalPhotoService from '#services/local_photo_service'
 import User from '#models/user'
 import {
+  changePasswordValidator,
   loginValidator,
   registerValidator,
   sendOtpValidator,
+  updateProfileValidator,
   validateIdentityValidator,
   validateRegistrationValidator,
   verifyOtpValidator,
@@ -276,5 +279,66 @@ export default class AuthController {
     await user.load('artisanProfile')
 
     return response.ok({ user: user.serialize() })
+  }
+
+  /**
+   * Update the authenticated user's own profile.
+   */
+  async updateProfile({ auth, request, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateProfileValidator)
+
+    if (payload.email && payload.email !== user.email) {
+      const taken = await User.query().where('email', payload.email).whereNot('id', user.id).first()
+
+      if (taken) {
+        return response.unprocessableEntity({
+          message: 'Email already in use',
+          errors: [{ field: 'email', message: 'Email already in use' }],
+        })
+      }
+    }
+
+    if (payload.phoneNumber && payload.phoneNumber !== user.phoneNumber) {
+      const taken = await User.query()
+        .where('phone_number', payload.phoneNumber)
+        .whereNot('id', user.id)
+        .first()
+
+      if (taken) {
+        return response.unprocessableEntity({
+          message: 'Phone number already in use',
+          errors: [{ field: 'phoneNumber', message: 'Phone number already in use' }],
+        })
+      }
+    }
+
+    user.merge(payload)
+    await user.save()
+    await user.load('artisanProfile')
+
+    return response.ok({ user: user.serialize() })
+  }
+
+  /**
+   * Change the authenticated user's password.
+   */
+  async changePassword({ auth, request, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const { currentPassword, newPassword } = await request.validateUsing(changePasswordValidator)
+
+    const isValid = await hash.verify(user.password, currentPassword)
+
+    if (!isValid) {
+      return response.unprocessableEntity({
+        message: 'Current password is incorrect',
+        errors: [{ field: 'currentPassword', message: 'Current password is incorrect' }],
+      })
+    }
+
+    user.password = newPassword
+    await user.save()
+
+    return response.ok({ message: 'Password updated successfully' })
   }
 }

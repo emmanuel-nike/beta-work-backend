@@ -73,13 +73,13 @@ npm run docker:prod
 
 ### GitHub Actions deploy
 
-Pushing to `main` runs tests, then deploys the production Docker stack to `162.0.236.252`.
+Pushing to `main` runs tests, then deploys the production Docker stack to `209.74.88.230` (`server1.beta-work.com`, serving `https://api.beta-work.com`).
 
 Create a GitHub **production** environment and add these secrets:
 
 | Secret            | Description                        |
 | ----------------- | ---------------------------------- |
-| `SSH_HOST`        | Server host (e.g. `162.0.236.252`) |
+| `SSH_HOST`        | Server host (e.g. `209.74.88.230`) |
 | `SSH_USERNAME`    | SSH username on the server         |
 | `SSH_PRIVATE_KEY` | Private key for SSH access         |
 

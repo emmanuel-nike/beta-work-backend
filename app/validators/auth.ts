@@ -120,3 +120,30 @@ export const loginValidator = vine.compile(
     password: vine.string(),
   })
 )
+
+/**
+ * Update the authenticated user's own profile. All fields optional (partial
+ * update); uniqueness of email/phone is enforced in the controller so the
+ * user's current values are excluded.
+ */
+export const updateProfileValidator = vine.compile(
+  vine.object({
+    firstName: vine.string().trim().minLength(1).maxLength(100).optional(),
+    lastName: vine.string().trim().minLength(1).maxLength(100).optional(),
+    email: vine.string().trim().email().normalizeEmail().optional(),
+    phoneNumber: vine.string().trim().minLength(7).maxLength(30).optional(),
+    city: vine.string().trim().maxLength(100).optional(),
+    state: vine.string().trim().maxLength(100).optional(),
+    address: vine.string().trim().maxLength(255).optional(),
+  })
+)
+
+/**
+ * Change the authenticated user's password.
+ */
+export const changePasswordValidator = vine.compile(
+  vine.object({
+    currentPassword: vine.string().minLength(1),
+    newPassword: vine.string().minLength(8).maxLength(72),
+  })
+)

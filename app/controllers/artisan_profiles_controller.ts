@@ -74,6 +74,26 @@ export default class ArtisanProfilesController {
   }
 
   /**
+   * Return the authenticated artisan's verification status.
+   */
+  async status({ auth, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    await user.load('artisanProfile')
+
+    if (!user.artisanProfile) {
+      return response.notFound({ message: 'Artisan profile not found' })
+    }
+
+    const { verificationStatus, verifiedAt } = user.artisanProfile
+
+    return response.ok({
+      verificationStatus,
+      isVerified: verificationStatus === VerificationStatus.APPROVED,
+      verifiedAt,
+    })
+  }
+
+  /**
    * Update the authenticated artisan's profile.
    */
   async update({ auth, request, response }: HttpContext) {
