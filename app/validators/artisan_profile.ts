@@ -32,6 +32,38 @@ export const updateArtisanProfileValidator = vine.compile(
   })
 )
 
+const dayScheduleSchema = vine.object({
+  enabled: vine.boolean(),
+  start: vine.string().trim().maxLength(10).optional(),
+  end: vine.string().trim().maxLength(10).optional(),
+})
+
+/**
+ * Validates the parsed portfolio payload. The controller decodes the JSON
+ * string fields that arrive over multipart before handing the object here.
+ */
+export const updateArtisanPortfolioValidator = vine.compile(
+  vine.object({
+    trade: vine.string().trim().minLength(1).maxLength(120),
+    bio: vine.string().trim().maxLength(2000).nullable().optional(),
+    yearsOfExperience: vine.number().min(0).max(80).optional(),
+    isAvailable: vine.boolean().optional(),
+    minimumLeadTimeHours: vine.number().min(0).max(720).nullable().optional(),
+    additionalServices: vine.array(vine.string().trim().maxLength(120)).optional(),
+    languages: vine.array(vine.string().trim().maxLength(60)).optional(),
+    servicePricing: vine
+      .array(
+        vine.object({
+          service: vine.string().trim().minLength(1).maxLength(120),
+          minPrice: vine.number().min(0).nullable().optional(),
+          maxPrice: vine.number().min(0).nullable().optional(),
+        })
+      )
+      .optional(),
+    weeklySchedule: vine.record(dayScheduleSchema).optional(),
+  })
+)
+
 export const verifyArtisanValidator = vine.compile(
   vine.object({
     verificationStatus: vine.enum([

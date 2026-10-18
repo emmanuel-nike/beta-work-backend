@@ -13,14 +13,22 @@ export default class LocalPhotoService {
    * Persist an artisan photo locally and return its public URL.
    */
   static async storeArtisanPhoto(photo: MultipartFile) {
+    return this.storeArtisanFile(photo)
+  }
+
+  /**
+   * Persist any artisan image upload (profile photo, certificate, or portfolio
+   * image) locally and return its public URL.
+   */
+  static async storeArtisanFile(file: MultipartFile) {
     const directory = app.makePath(this.UPLOAD_DIR)
     await mkdir(directory, { recursive: true })
 
-    const fileName = `${cuid()}.${photo.extname}`
-    await photo.move(directory, { name: fileName })
+    const fileName = `${cuid()}.${file.extname}`
+    await file.move(directory, { name: fileName })
 
-    if (photo.state !== 'moved') {
-      throw new Error(photo.errors[0]?.message ?? 'Unable to store photo')
+    if (file.state !== 'moved') {
+      throw new Error(file.errors[0]?.message ?? 'Unable to store file')
     }
 
     return `${this.PUBLIC_URL_PREFIX}/${fileName}`

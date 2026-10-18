@@ -1,10 +1,47 @@
 import { unlink } from 'node:fs/promises'
 import type { HttpContext } from '@adonisjs/core/http'
+import type { MultipartFile } from '@adonisjs/core/bodyparser'
 import cache from '@adonisjs/cache/services/main'
 import VerificationStatus from '#enums/verification_status'
 import ArtisanProfile from '#models/artisan_profile'
 import LocalPhotoService from '#services/local_photo_service'
-import { updateArtisanProfileValidator } from '#validators/artisan_profile'
+import {
+  updateArtisanPortfolioValidator,
+  updateArtisanProfileValidator,
+} from '#validators/artisan_profile'
+
+/** Parse a JSON string field from a multipart request, tolerating absence. */
+function parseJsonField(value: unknown): unknown {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+  if (typeof value !== 'string') {
+    return value
+  }
+  try {
+    return JSON.parse(value)
+  } catch {
+    return undefined
+  }
+}
+
+function parseBoolean(value: unknown): boolean | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+  if (typeof value === 'boolean') {
+    return value
+  }
+  return value === 'true' || value === '1'
+}
+
+function parseNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') {
+    return undefined
+  }
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
 
 export default class ArtisanProfilesController {
   /**
@@ -138,6 +175,166 @@ export default class ArtisanProfilesController {
     await cache.clear()
 
     return response.ok({ artisanProfile: user.artisanProfile.serialize() })
+  }
+
+  /**
+   * Save the authenticated artisan's post-verification portfolio. Accepts a
+   * multipart payload: scalar fields, JSON-encoded collections, and image
+   * uploads (profile photo, certificate, and portfolio gallery).
+   */
+  async updatePortfolio({ auth, request, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    await user.load('artisanProfile')
+
+    if (!user.artisanProfile) {
+      return response.notFound({ message: 'Artisan profile not found' })
+    }
+
+    const profile = user.artisanProfile
+
+    // Decode the multipart text fields before validating the shaped object.
+    const raw = request.body()
+    let payload: Awaited<ReturnType<typeof updateArtisanPortfolioValidator.validate>>
+    try {
+      payload = await updateArtisanPortfolioValidator.validate({
+        trade: raw.trade,
+        bio: raw.bio,
+        yearsOfExperience: parseNumber(raw.yearsOfExperience),
+        isAvailable: parseBoolean(raw.isAvailable),
+        minimumLeadTimeHours: parseNumber(raw.minimumLeadTimeHours),
+        additionalServices: parseJsonField(raw.additionalServices),
+        languages: parseJsonField(raw.languages),
+        servicePricing: parseJsonField(raw.servicePricing),
+        weeklySchedule: parseJsonField(raw.weeklySchedule),
+      })
+    } catch (error) {
+      return response.unprocessableEntity({
+        message: 'Validation failed',
+        errors: (error as { messages?: unknown }).messages ?? error,
+      })
+    }
+
+    const fileOptions = {
+      size: LocalPhotoService.MAX_SIZE,
+      extnames: [...LocalPhotoService.EXTNAMES],
+    }
+
+    // --- Profile photo (replaces the previous one) ---
+    const photo = request.file('photo', fileOptions)
+    if (photo) {
+      const stored = await this.storeOrFail(photo, response)
+      if (!stored.ok) {
+        return stored.response
+      }
+      const previous = profile.photoUrl
+      profile.photoUrl = stored.url
+      await this.removeLocalFile(previous)
+    }
+
+    // --- Certificate (optional) ---
+    const certificate = request.file('certificate', fileOptions)
+    if (certificate) {
+      const stored = await this.storeOrFail(certificate, response)
+      if (!stored.ok) {
+        return stored.response
+      }
+      const previous = profile.certificateUrl
+      profile.certificateUrl = stored.url
+      await this.removeLocalFile(previous)
+    }
+
+    // --- Portfolio gallery: kept remote urls + newly uploaded files ---
+    const keep = parseJsonField(raw.keepPortfolioImages)
+    const keepImages = Array.isArray(keep)
+      ? keep.filter((item): item is string => typeof item === 'string')
+      : (profile.portfolioImages ?? [])
+
+    const uploads = request.files('portfolioImages', fileOptions)
+    const uploadedUrls: string[] = []
+    for (const file of uploads) {
+      const stored = await this.storeOrFail(file, response)
+      if (!stored.ok) {
+        return stored.response
+      }
+      uploadedUrls.push(stored.url)
+    }
+
+    const nextImages = [...keepImages, ...uploadedUrls]
+    // Drop any previously stored local images the client chose to remove.
+    const removedImages = (profile.portfolioImages ?? []).filter((url) => !nextImages.includes(url))
+    for (const url of removedImages) {
+      await this.removeLocalFile(url)
+    }
+
+    profile.trade = payload.trade
+    if (payload.bio !== undefined) {
+      profile.bio = payload.bio
+    }
+    if (payload.yearsOfExperience !== undefined) {
+      profile.yearsOfExperience = payload.yearsOfExperience
+    }
+    if (payload.isAvailable !== undefined) {
+      profile.isAvailable = payload.isAvailable
+    }
+    if (payload.minimumLeadTimeHours !== undefined) {
+      profile.minimumLeadTimeHours = payload.minimumLeadTimeHours
+    }
+    if (payload.additionalServices !== undefined) {
+      profile.additionalServices = payload.additionalServices
+    }
+    if (payload.languages !== undefined) {
+      profile.languages = payload.languages
+    }
+    if (payload.servicePricing !== undefined) {
+      profile.servicePricing = payload.servicePricing
+    }
+    if (payload.weeklySchedule !== undefined) {
+      profile.weeklySchedule = payload.weeklySchedule
+    }
+    profile.portfolioImages = nextImages
+
+    await profile.save()
+    await cache.clear()
+
+    return response.ok({ artisanProfile: profile.serialize() })
+  }
+
+  /**
+   * Validate + persist a single upload, returning either its URL or the error
+   * response to surface to the client.
+   */
+  private async storeOrFail(
+    file: MultipartFile,
+    response: HttpContext['response']
+  ): Promise<{ ok: true; url: string } | { ok: false; response: unknown }> {
+    if (!file.isValid) {
+      return {
+        ok: false,
+        response: response.unprocessableEntity({
+          message: file.errors[0]?.message ?? 'Invalid file upload',
+          errors: file.errors,
+        }),
+      }
+    }
+
+    try {
+      return { ok: true, url: await LocalPhotoService.storeArtisanFile(file) }
+    } catch (error) {
+      return {
+        ok: false,
+        response: response.badRequest({
+          message: error instanceof Error ? error.message : 'Unable to store file',
+        }),
+      }
+    }
+  }
+
+  /** Delete a locally hosted upload, ignoring remote urls and missing files. */
+  private async removeLocalFile(url: string | null | undefined) {
+    if (!url || !url.startsWith(LocalPhotoService.PUBLIC_URL_PREFIX)) {
+      return
+    }
+    await unlink(LocalPhotoService.absolutePathFromUrl(url)).catch(() => {})
   }
 
   /**

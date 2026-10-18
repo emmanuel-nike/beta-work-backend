@@ -44,6 +44,7 @@ router
             router.get('/artisan/profile', [ArtisanProfilesController, 'mine'])
             router.get('/artisan/status', [ArtisanProfilesController, 'status'])
             router.put('/artisan/profile', [ArtisanProfilesController, 'update'])
+            router.put('/artisan/portfolio', [ArtisanProfilesController, 'updatePortfolio'])
           })
           .use(middleware.role({ roles: [UserRole.ARTISAN] }))
 
