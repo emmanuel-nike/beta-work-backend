@@ -44,10 +44,13 @@ const bodyParserConfig = defineConfig({
     processManually: [],
 
     /**
-     * Maximum limit of data to parse including all files
-     * and fields
+     * Maximum limit of data to parse including all files and fields.
+     *
+     * The artisan portfolio upload can carry a profile photo, a certificate
+     * and up to six gallery images (5mb each per LocalPhotoService), so the
+     * combined multipart body needs headroom well above the old 20mb cap.
      */
-    limit: '20mb',
+    limit: '60mb',
     types: ['multipart/form-data'],
   },
 })
