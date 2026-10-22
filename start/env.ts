@@ -31,5 +31,19 @@ export default await Env.create(new URL('../', import.meta.url), {
 
   REDIS_HOST: Env.schema.string({ format: 'host' }),
   REDIS_PORT: Env.schema.number(),
-  REDIS_PASSWORD: Env.schema.string.optional()
+  REDIS_PASSWORD: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Variables for configuring the mail package
+  |----------------------------------------------------------
+  | All optional so the app can boot (and tests run) without a real
+  | SMTP server; delivery failures are handled gracefully at send time.
+  */
+  SMTP_HOST: Env.schema.string.optional(),
+  SMTP_PORT: Env.schema.number.optional(),
+  SMTP_USERNAME: Env.schema.string.optional(),
+  SMTP_PASSWORD: Env.schema.string.optional(),
+  MAIL_FROM_ADDRESS: Env.schema.string.optional(),
+  MAIL_FROM_NAME: Env.schema.string.optional(),
 })

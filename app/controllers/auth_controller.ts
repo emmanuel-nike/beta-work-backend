@@ -1,21 +1,26 @@
 import type { HttpContext } from '@adonisjs/core/http'
 import hash from '@adonisjs/core/services/hash'
+import app from '@adonisjs/core/services/app'
 import cache from '@adonisjs/cache/services/main'
 import db from '@adonisjs/lucid/services/db'
 import UserRole from '#enums/user_role'
 import VerificationStatus from '#enums/verification_status'
 import ArtisanProfile from '#models/artisan_profile'
 import LocalPhotoService from '#services/local_photo_service'
+import MailerService from '#services/mailer_service'
 import User from '#models/user'
 import {
   changePasswordValidator,
+  forgotPasswordValidator,
   loginValidator,
   registerValidator,
+  resetPasswordValidator,
   sendOtpValidator,
   updateProfileValidator,
   validateIdentityValidator,
   validateRegistrationValidator,
   verifyOtpValidator,
+  verifyPasswordOtpValidator,
 } from '#validators/auth'
 
 export default class AuthController {
@@ -77,32 +82,74 @@ export default class AuthController {
     })
   }
 
+  /*
+   * ---------------------------------------------------------------------------
+   * Phone-based OTP (replaced by email OTP below). Kept, commented out, for
+   * reference should SMS verification return.
+   * ---------------------------------------------------------------------------
+   *
+   * async sendOtp({ request, response }: HttpContext) {
+   *   const { phoneNumber } = await request.validateUsing(sendOtpValidator)
+   *   const otp = String(Math.floor(100000 + Math.random() * 900000))
+   *
+   *   await cache.set({ key: this.otpCacheKey(phoneNumber), value: otp, ttl: '10m' })
+   *
+   *   return response.ok({ message: 'OTP sent successfully', phoneNumber, otp })
+   * }
+   *
+   * async verifyOtp({ request, response }: HttpContext) {
+   *   const { phoneNumber, otp } = await request.validateUsing(verifyOtpValidator)
+   *   const cachedOtp = await cache.get({ key: this.otpCacheKey(phoneNumber) })
+   *
+   *   if (!cachedOtp || cachedOtp !== otp) {
+   *     return response.unprocessableEntity({ message: 'Invalid or expired OTP' })
+   *   }
+   *
+   *   await cache.delete({ key: this.otpCacheKey(phoneNumber) })
+   *   await cache.set({ key: this.verifiedPhoneCacheKey(phoneNumber), value: true, ttl: '30m' })
+   *
+   *   return response.ok({ message: 'Phone number verified successfully', phoneNumber, verified: true })
+   * }
+   *
+   * private otpCacheKey(phoneNumber: string) {
+   *   return `otp:phone:${phoneNumber}`
+   * }
+   *
+   * private verifiedPhoneCacheKey(phoneNumber: string) {
+   *   return `otp:verified:${phoneNumber}`
+   * }
+   */
+
   /**
-   * Dummy OTP send for phone verification. Returns a generated OTP for now.
+   * Send an email OTP for signup / artisan onboarding verification.
+   * The code is cached (TTL 10m) and emailed; outside production it is also
+   * returned in the response to ease development and testing.
    */
   async sendOtp({ request, response }: HttpContext) {
-    const { phoneNumber } = await request.validateUsing(sendOtpValidator)
-    const otp = String(Math.floor(100000 + Math.random() * 900000))
+    const { email } = await request.validateUsing(sendOtpValidator)
+    const otp = this.generateOtp()
 
     await cache.set({
-      key: this.otpCacheKey(phoneNumber),
+      key: this.otpCacheKey(email),
       value: otp,
       ttl: '10m',
     })
 
+    await MailerService.sendOtpEmail(email, otp)
+
     return response.ok({
       message: 'OTP sent successfully',
-      phoneNumber,
-      otp,
+      email,
+      ...this.devOtp(otp),
     })
   }
 
   /**
-   * Verify a phone number OTP issued by sendOtp.
+   * Verify an email OTP issued by sendOtp.
    */
   async verifyOtp({ request, response }: HttpContext) {
-    const { phoneNumber, otp } = await request.validateUsing(verifyOtpValidator)
-    const cachedOtp = await cache.get({ key: this.otpCacheKey(phoneNumber) })
+    const { email, otp } = await request.validateUsing(verifyOtpValidator)
+    const cachedOtp = await cache.get({ key: this.otpCacheKey(email) })
 
     if (!cachedOtp || cachedOtp !== otp) {
       return response.unprocessableEntity({
@@ -110,26 +157,129 @@ export default class AuthController {
       })
     }
 
-    await cache.delete({ key: this.otpCacheKey(phoneNumber) })
+    await cache.delete({ key: this.otpCacheKey(email) })
     await cache.set({
-      key: this.verifiedPhoneCacheKey(phoneNumber),
+      key: this.verifiedEmailCacheKey(email),
       value: true,
       ttl: '30m',
     })
 
     return response.ok({
-      message: 'Phone number verified successfully',
-      phoneNumber,
+      message: 'Email verified successfully',
+      email,
       verified: true,
     })
   }
 
-  private otpCacheKey(phoneNumber: string) {
-    return `otp:phone:${phoneNumber}`
+  /**
+   * Start a password reset. Always responds 200 with the same message whether
+   * or not an account exists (anti-enumeration); a code is generated, cached
+   * under a reset-only namespace (TTL 10m), and emailed only when the account
+   * actually exists. Outside production the code is returned in the response.
+   */
+  async forgotPassword({ request, response }: HttpContext) {
+    const { email } = await request.validateUsing(forgotPasswordValidator)
+    const message = 'If an account exists for that email, a reset code has been sent'
+
+    const user = await User.findBy('email', email)
+
+    if (!user) {
+      return response.ok({ message })
+    }
+
+    const otp = this.generateOtp()
+
+    await cache.set({
+      key: this.passwordResetCacheKey(email),
+      value: otp,
+      ttl: '10m',
+    })
+
+    await MailerService.sendPasswordResetEmail(email, otp)
+
+    return response.ok({
+      message,
+      ...this.devOtp(otp),
+    })
   }
 
-  private verifiedPhoneCacheKey(phoneNumber: string) {
-    return `otp:verified:${phoneNumber}`
+  /**
+   * Verify a password-reset OTP without consuming it. The reset step re-checks
+   * and consumes the code.
+   */
+  async verifyPasswordOtp({ request, response }: HttpContext) {
+    const { email, otp } = await request.validateUsing(verifyPasswordOtpValidator)
+    const cachedOtp = await cache.get({ key: this.passwordResetCacheKey(email) })
+
+    if (!cachedOtp || cachedOtp !== otp) {
+      return response.unprocessableEntity({
+        message: 'Invalid or expired OTP',
+      })
+    }
+
+    return response.ok({
+      message: 'OTP verified successfully',
+      verified: true,
+    })
+  }
+
+  /**
+   * Complete a password reset: validate the OTP, set the new password, delete
+   * the reset code, and revoke any existing access tokens.
+   */
+  async resetPassword({ request, response }: HttpContext) {
+    const { email, otp, password } = await request.validateUsing(resetPasswordValidator)
+    const cachedOtp = await cache.get({ key: this.passwordResetCacheKey(email) })
+
+    if (!cachedOtp || cachedOtp !== otp) {
+      return response.unprocessableEntity({
+        message: 'Invalid or expired OTP',
+      })
+    }
+
+    const user = await User.findBy('email', email)
+
+    if (!user) {
+      // The code was valid but the account is gone; treat as expired.
+      await cache.delete({ key: this.passwordResetCacheKey(email) })
+      return response.unprocessableEntity({
+        message: 'Invalid or expired OTP',
+      })
+    }
+
+    user.password = password
+    await user.save()
+
+    await cache.delete({ key: this.passwordResetCacheKey(email) })
+
+    // Revoke existing sessions so the reset also signs the user out everywhere.
+    const tokens = await User.accessTokens.all(user)
+    await Promise.all(tokens.map((token) => User.accessTokens.delete(user, token.identifier)))
+
+    return response.ok({ message: 'Password reset successfully' })
+  }
+
+  private generateOtp() {
+    return String(Math.floor(100000 + Math.random() * 900000))
+  }
+
+  /**
+   * Expose the OTP in the response only outside production.
+   */
+  private devOtp(otp: string) {
+    return app.inProduction ? {} : { otp }
+  }
+
+  private otpCacheKey(email: string) {
+    return `otp:email:${email}`
+  }
+
+  private verifiedEmailCacheKey(email: string) {
+    return `otp:verified:${email}`
+  }
+
+  private passwordResetCacheKey(email: string) {
+    return `pwreset:email:${email}`
   }
 
   /**

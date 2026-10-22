@@ -302,20 +302,25 @@ paths:
   /auth/otp/send:
     post:
       tags: [Auth]
-      summary: Send phone OTP (dummy)
+      summary: Send email OTP (signup / artisan onboarding)
+      description: >
+        Generates a 6-digit code, caches it for 10 minutes and emails it via
+        SMTP. Outside production the `otp` is also returned in the response; in
+        production the `otp` field is omitted.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [phoneNumber]
+              required: [email]
               properties:
-                phoneNumber:
+                email:
                   type: string
+                  format: email
       responses:
         '200':
-          description: OTP generated (returned in body for now)
+          description: OTP sent (otp included only outside production)
           content:
             application/json:
               schema:
@@ -323,8 +328,9 @@ paths:
                 properties:
                   message:
                     type: string
-                  phoneNumber:
+                  email:
                     type: string
+                    format: email
                   otp:
                     type: string
                     example: '483920'
@@ -332,24 +338,25 @@ paths:
   /auth/otp/verify:
     post:
       tags: [Auth]
-      summary: Verify phone OTP
+      summary: Verify email OTP
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [phoneNumber, otp]
+              required: [email, otp]
               properties:
-                phoneNumber:
+                email:
                   type: string
+                  format: email
                 otp:
                   type: string
                   minLength: 6
                   maxLength: 6
       responses:
         '200':
-          description: Phone verified
+          description: Email verified
           content:
             application/json:
               schema:
@@ -357,12 +364,128 @@ paths:
                 properties:
                   message:
                     type: string
-                  phoneNumber:
+                  email:
+                    type: string
+                    format: email
+                  verified:
+                    type: boolean
+        '422':
+          description: Invalid or expired OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+
+  /auth/password/forgot:
+    post:
+      tags: [Auth]
+      summary: Request a password reset code by email
+      description: >
+        Always responds 200 with the same message whether or not an account
+        exists (anti-enumeration). A reset code is cached for 10 minutes and
+        emailed only when the account exists. Outside production the `otp` is
+        included in the response for accounts that exist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+      responses:
+        '200':
+          description: Generic acknowledgement (otp present only outside production and when the account exists)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  otp:
+                    type: string
+                    example: '614238'
+
+  /auth/password/verify-otp:
+    post:
+      tags: [Auth]
+      summary: Verify a password reset code (does not consume it)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp]
+              properties:
+                email:
+                  type: string
+                  format: email
+                otp:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+      responses:
+        '200':
+          description: OTP verified
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
                     type: string
                   verified:
                     type: boolean
         '422':
           description: Invalid or expired OTP
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorMessage'
+
+  /auth/password/reset:
+    post:
+      tags: [Auth]
+      summary: Reset password using a reset code
+      description: >
+        Validates the reset code, sets the new password, consumes the code and
+        revokes the user's existing access tokens.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, otp, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                otp:
+                  type: string
+                  minLength: 6
+                  maxLength: 6
+                password:
+                  type: string
+                  minLength: 8
+                  maxLength: 72
+      responses:
+        '200':
+          description: Password reset
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+        '422':
+          description: Invalid or expired OTP, or validation failure
           content:
             application/json:
               schema:

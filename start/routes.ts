@@ -29,6 +29,9 @@ router
     router.post('/auth/validate/identity', [AuthController, 'validateIdentity'])
     router.post('/auth/otp/send', [AuthController, 'sendOtp'])
     router.post('/auth/otp/verify', [AuthController, 'verifyOtp'])
+    router.post('/auth/password/forgot', [AuthController, 'forgotPassword'])
+    router.post('/auth/password/verify-otp', [AuthController, 'verifyPasswordOtp'])
+    router.post('/auth/password/reset', [AuthController, 'resetPassword'])
     router.post('/auth/register', [AuthController, 'register'])
     router.post('/auth/login', [AuthController, 'login'])
 
