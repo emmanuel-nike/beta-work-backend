@@ -101,16 +101,61 @@ export const validateIdentityValidator = vine.compile(
   })
 )
 
+/*
+ * Phone-based OTP validators (replaced by the email versions below).
+ * Kept here, commented out, for reference should SMS verification return.
+ *
+ * export const sendOtpValidator = vine.compile(
+ *   vine.object({
+ *     phoneNumber: vine.string().trim().minLength(7).maxLength(30),
+ *   })
+ * )
+ *
+ * export const verifyOtpValidator = vine.compile(
+ *   vine.object({
+ *     phoneNumber: vine.string().trim().minLength(7).maxLength(30),
+ *     otp: vine.string().trim().fixedLength(6),
+ *   })
+ * )
+ */
+
+/**
+ * Email-based OTP for signup and artisan onboarding verification.
+ */
 export const sendOtpValidator = vine.compile(
   vine.object({
-    phoneNumber: vine.string().trim().minLength(7).maxLength(30),
+    email: vine.string().trim().email().normalizeEmail(),
   })
 )
 
 export const verifyOtpValidator = vine.compile(
   vine.object({
-    phoneNumber: vine.string().trim().minLength(7).maxLength(30),
+    email: vine.string().trim().email().normalizeEmail(),
     otp: vine.string().trim().fixedLength(6),
+  })
+)
+
+/**
+ * Forgot-password flow validators.
+ */
+export const forgotPasswordValidator = vine.compile(
+  vine.object({
+    email: vine.string().trim().email().normalizeEmail(),
+  })
+)
+
+export const verifyPasswordOtpValidator = vine.compile(
+  vine.object({
+    email: vine.string().trim().email().normalizeEmail(),
+    otp: vine.string().trim().fixedLength(6),
+  })
+)
+
+export const resetPasswordValidator = vine.compile(
+  vine.object({
+    email: vine.string().trim().email().normalizeEmail(),
+    otp: vine.string().trim().fixedLength(6),
+    password: vine.string().minLength(8).maxLength(72),
   })
 )
 

@@ -1,11 +1,19 @@
 import { test } from '@japa/runner'
 import testUtils from '@adonisjs/core/services/test_utils'
+import mail from '@adonisjs/mail/services/main'
 import UserRole from '#enums/user_role'
 import User from '#models/user'
 import { createUser, uniqueDigits, uniqueEmail, uniquePhone } from '#tests/helpers'
 
 test.group('Auth API', (group) => {
   group.each.setup(() => testUtils.db().withGlobalTransaction())
+
+  // Swap the real SMTP transport for an in-memory fake so tests never touch
+  // a live mail server.
+  group.each.setup(() => {
+    mail.fake()
+    return () => mail.restore()
+  })
 
   test('GET / returns API metadata', async ({ client }) => {
     const response = await client.get('/')
@@ -61,33 +69,106 @@ test.group('Auth API', (group) => {
   })
 
   test('POST /auth/otp/send and verify succeed', async ({ client }) => {
-    const phoneNumber = uniquePhone()
+    const email = uniqueEmail('otp')
 
-    const sendResponse = await client.post('/api/v1/auth/otp/send').json({ phoneNumber })
+    const sendResponse = await client.post('/api/v1/auth/otp/send').json({ email })
     sendResponse.assertStatus(200)
-    sendResponse.assertBodyContains({ message: 'OTP sent successfully', phoneNumber })
+    sendResponse.assertBodyContains({ message: 'OTP sent successfully', email })
 
     const otp = sendResponse.body().otp as string
 
-    const verifyResponse = await client.post('/api/v1/auth/otp/verify').json({ phoneNumber, otp })
+    const verifyResponse = await client.post('/api/v1/auth/otp/verify').json({ email, otp })
     verifyResponse.assertStatus(200)
     verifyResponse.assertBodyContains({
-      message: 'Phone number verified successfully',
+      message: 'Email verified successfully',
+      email,
       verified: true,
     })
   })
 
   test('POST /auth/otp/verify rejects invalid otp', async ({ client }) => {
-    const phoneNumber = uniquePhone()
-    await client.post('/api/v1/auth/otp/send').json({ phoneNumber })
+    const email = uniqueEmail('otp-bad')
+    await client.post('/api/v1/auth/otp/send').json({ email })
 
     const response = await client.post('/api/v1/auth/otp/verify').json({
-      phoneNumber,
+      email,
       otp: '000000',
     })
 
     response.assertStatus(422)
     response.assertBodyContains({ message: 'Invalid or expired OTP' })
+  })
+
+  test('POST /auth/otp/verify rejects expired/unknown otp', async ({ client }) => {
+    // No send call first, so nothing is cached for this email.
+    const response = await client.post('/api/v1/auth/otp/verify').json({
+      email: uniqueEmail('otp-expired'),
+      otp: '123456',
+    })
+
+    response.assertStatus(422)
+    response.assertBodyContains({ message: 'Invalid or expired OTP' })
+  })
+
+  test('forgot-password → reset flow lets the user log in with the new password', async ({
+    client,
+  }) => {
+    const email = uniqueEmail('forgot')
+    const oldPassword = 'password123'
+    const newPassword = 'brand-new-pass-456'
+    await createUser({ email, password: oldPassword, role: UserRole.USER })
+
+    const forgotResponse = await client.post('/api/v1/auth/password/forgot').json({ email })
+    forgotResponse.assertStatus(200)
+    const otp = forgotResponse.body().otp as string
+
+    // Verify-otp should pass without consuming the code.
+    const verifyResponse = await client
+      .post('/api/v1/auth/password/verify-otp')
+      .json({ email, otp })
+    verifyResponse.assertStatus(200)
+    verifyResponse.assertBodyContains({ verified: true })
+
+    const resetResponse = await client
+      .post('/api/v1/auth/password/reset')
+      .json({ email, otp, password: newPassword })
+    resetResponse.assertStatus(200)
+    resetResponse.assertBodyContains({ message: 'Password reset successfully' })
+
+    // Old password no longer works.
+    const oldLogin = await client.post('/api/v1/auth/login').json({ email, password: oldPassword })
+    oldLogin.assertStatus(400)
+
+    // New password works.
+    const newLogin = await client.post('/api/v1/auth/login').json({ email, password: newPassword })
+    newLogin.assertStatus(200)
+    newLogin.assertBodyContains({ type: 'bearer', user: { email } })
+  })
+
+  test('POST /auth/password/reset rejects a bad otp', async ({ client }) => {
+    const email = uniqueEmail('reset-bad')
+    await createUser({ email, password: 'password123', role: UserRole.USER })
+
+    await client.post('/api/v1/auth/password/forgot').json({ email })
+
+    const response = await client
+      .post('/api/v1/auth/password/reset')
+      .json({ email, otp: '000000', password: 'another-strong-pass' })
+
+    response.assertStatus(422)
+    response.assertBodyContains({ message: 'Invalid or expired OTP' })
+  })
+
+  test('POST /auth/password/forgot returns 200 with no otp for unknown email', async ({
+    client,
+    assert,
+  }) => {
+    const response = await client
+      .post('/api/v1/auth/password/forgot')
+      .json({ email: uniqueEmail('nobody') })
+
+    response.assertStatus(200)
+    assert.isUndefined(response.body().otp)
   })
 
   test('POST /auth/register creates a normal user and returns a token', async ({ client }) => {

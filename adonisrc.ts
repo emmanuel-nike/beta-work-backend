@@ -29,6 +29,7 @@ export default defineConfig({
     () => import('@adonisjs/core/commands'),
     () => import('@adonisjs/lucid/commands'),
     () => import('@adonisjs/cache/commands'),
+    () => import('@adonisjs/mail/commands'),
   ],
 
   /*
@@ -48,11 +49,13 @@ export default defineConfig({
       environment: ['repl', 'test'],
     },
     () => import('@adonisjs/core/providers/vinejs_provider'),
+    () => import('@adonisjs/core/providers/edge_provider'),
     () => import('@adonisjs/cors/cors_provider'),
     () => import('@adonisjs/lucid/database_provider'),
     () => import('@adonisjs/auth/auth_provider'),
     () => import('@adonisjs/redis/redis_provider'),
     () => import('@adonisjs/cache/cache_provider'),
+    () => import('@adonisjs/mail/mail_provider'),
   ],
 
   /*

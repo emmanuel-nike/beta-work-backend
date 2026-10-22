@@ -29,16 +29,22 @@ Tokens are issued by `POST /auth/register` and `POST /auth/login`.
 ### User registration
 
 1. `POST /auth/validate` — validate name, email, phone, address
-2. `POST /auth/otp/send` — request OTP
-3. `POST /auth/otp/verify` — verify OTP
+2. `POST /auth/otp/send` — request email OTP
+3. `POST /auth/otp/verify` — verify email OTP
 4. `POST /auth/register` — create account (`role` omitted or `"user"`)
 
 ### Artisan registration
 
 1. `POST /auth/validate` — validate name, email, phone, address
-2. `POST /auth/otp/send` → `POST /auth/otp/verify`
+2. `POST /auth/otp/send` → `POST /auth/otp/verify` (email OTP)
 3. `POST /auth/validate/identity` — NIN, BVN, photo (`multipart`) → save returned `photoUrl` if needed
 4. `POST /auth/register` — `role: "artisan"` + `artisanProfile` + `photo` (`multipart`)
+
+### Forgot password
+
+1. `POST /auth/password/forgot` — request a reset code by email (always 200)
+2. `POST /auth/password/verify-otp` — check the code (optional UX step)
+3. `POST /auth/password/reset` — set a new password with the code
 
 ---
 
@@ -153,13 +159,16 @@ Validate artisan NIN/BVN (format + uniqueness stub) and upload photo.
 
 #### `POST /auth/otp/send`
 
-Send phone OTP (dummy — returns OTP in response for now).
+Send an email OTP (signup / artisan onboarding). The 6-digit code is emailed
+(SMTP) and cached for 10 minutes. **Outside production** the `otp` is also
+returned in the response to ease development; in production the `otp` field is
+omitted.
 
 **Auth:** Public  
 **Content-Type:** `application/json`
 
 ```json
-{ "phoneNumber": "+2348012345678" }
+{ "email": "ada@example.com" }
 ```
 
 **Response `200`**
@@ -167,7 +176,7 @@ Send phone OTP (dummy — returns OTP in response for now).
 ```json
 {
   "message": "OTP sent successfully",
-  "phoneNumber": "+2348012345678",
+  "email": "ada@example.com",
   "otp": "483920"
 }
 ```
@@ -178,14 +187,14 @@ OTP expires in **10 minutes**.
 
 #### `POST /auth/otp/verify`
 
-Verify phone OTP.
+Verify an email OTP.
 
 **Auth:** Public  
 **Content-Type:** `application/json`
 
 ```json
 {
-  "phoneNumber": "+2348012345678",
+  "email": "ada@example.com",
   "otp": "483920"
 }
 ```
@@ -194,13 +203,104 @@ Verify phone OTP.
 
 ```json
 {
-  "message": "Phone number verified successfully",
-  "phoneNumber": "+2348012345678",
+  "message": "Email verified successfully",
+  "email": "ada@example.com",
   "verified": true
 }
 ```
 
 **Response `422`** — invalid/expired OTP
+
+```json
+{ "message": "Invalid or expired OTP" }
+```
+
+---
+
+#### `POST /auth/password/forgot`
+
+Start a password reset. **Always** returns `200` with the same message whether
+or not an account exists (anti-enumeration). A reset code is generated, cached
+for 10 minutes under a reset-only namespace, and emailed **only when the account
+exists**. Outside production the `otp` is included in the response for accounts
+that exist.
+
+**Auth:** Public  
+**Content-Type:** `application/json`
+
+```json
+{ "email": "ada@example.com" }
+```
+
+**Response `200`**
+
+```json
+{
+  "message": "If an account exists for that email, a reset code has been sent",
+  "otp": "614238"
+}
+```
+
+For an unknown email the response is identical but omits `otp`.
+
+---
+
+#### `POST /auth/password/verify-otp`
+
+Check a reset code **without consuming it** (optional UX step before showing the
+new-password form).
+
+**Auth:** Public  
+**Content-Type:** `application/json`
+
+```json
+{
+  "email": "ada@example.com",
+  "otp": "614238"
+}
+```
+
+**Response `200`**
+
+```json
+{
+  "message": "OTP verified successfully",
+  "verified": true
+}
+```
+
+**Response `422`** — invalid/expired OTP
+
+```json
+{ "message": "Invalid or expired OTP" }
+```
+
+---
+
+#### `POST /auth/password/reset`
+
+Set a new password using the reset code. On success the code is consumed and the
+user's existing access tokens are revoked.
+
+**Auth:** Public  
+**Content-Type:** `application/json`
+
+```json
+{
+  "email": "ada@example.com",
+  "otp": "614238",
+  "password": "new-strong-password"
+}
+```
+
+**Response `200`**
+
+```json
+{ "message": "Password reset successfully" }
+```
+
+**Response `422`** — invalid/expired OTP or validation failure (`password` must be
+8–72 characters)
 
 ```json
 { "message": "Invalid or expired OTP" }
