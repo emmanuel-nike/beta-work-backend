@@ -70,6 +70,23 @@ export default defineConfig({
 
   /*
   |--------------------------------------------------------------------------
+  | Meta files
+  |--------------------------------------------------------------------------
+  |
+  | Non-source files to copy into the production build output. The Edge email
+  | templates must be listed here, otherwise `node ace build` omits them and
+  | the mailer fails to render at runtime.
+  |
+  */
+  metaFiles: [
+    {
+      pattern: 'resources/views/**/*.edge',
+      reloadServer: false,
+    },
+  ],
+
+  /*
+  |--------------------------------------------------------------------------
   | Tests
   |--------------------------------------------------------------------------
   |

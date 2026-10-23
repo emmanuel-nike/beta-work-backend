@@ -172,19 +172,20 @@ export default class AuthController {
   }
 
   /**
-   * Start a password reset. Always responds 200 with the same message whether
-   * or not an account exists (anti-enumeration); a code is generated, cached
-   * under a reset-only namespace (TTL 10m), and emailed only when the account
-   * actually exists. Outside production the code is returned in the response.
+   * Start a password reset. Responds 404 when no account matches the email so
+   * the client can prompt the user to correct it. For a real account a code is
+   * generated, cached under a reset-only namespace (TTL 10m), and emailed.
+   * Outside production the code is returned in the response.
    */
   async forgotPassword({ request, response }: HttpContext) {
     const { email } = await request.validateUsing(forgotPasswordValidator)
-    const message = 'If an account exists for that email, a reset code has been sent'
 
     const user = await User.findBy('email', email)
 
     if (!user) {
-      return response.ok({ message })
+      return response.notFound({
+        message: 'No account found for that email address',
+      })
     }
 
     const otp = this.generateOtp()
@@ -198,7 +199,7 @@ export default class AuthController {
     await MailerService.sendPasswordResetEmail(email, otp)
 
     return response.ok({
-      message,
+      message: 'A reset code has been sent to your email',
       ...this.devOtp(otp),
     })
   }
