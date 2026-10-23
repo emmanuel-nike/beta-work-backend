@@ -1,7 +1,10 @@
 import { randomBytes } from 'node:crypto'
+import { DateTime } from 'luxon'
+import BookingStatus from '#enums/booking_status'
 import UserRole from '#enums/user_role'
 import VerificationStatus from '#enums/verification_status'
 import ArtisanProfile from '#models/artisan_profile'
+import Booking from '#models/booking'
 import User from '#models/user'
 
 export function uniquePhone(prefix = '+23480') {
@@ -76,4 +79,33 @@ export async function createArtisan(
 
   await user.load('artisanProfile')
   return { user, profile }
+}
+
+export async function createBooking(
+  overrides: Partial<{
+    client: User
+    artisan: User
+    status: BookingStatus
+    trade: string
+    service: string
+    budget: number
+    scheduledAt: DateTime
+  }> = {}
+) {
+  const client = overrides.client ?? (await createUser({ role: UserRole.USER }))
+  let artisan = overrides.artisan
+  if (!artisan) {
+    const created = await createArtisan({ verificationStatus: VerificationStatus.APPROVED })
+    artisan = created.user
+  }
+
+  return Booking.create({
+    clientId: client.id,
+    artisanId: artisan.id,
+    status: overrides.status ?? BookingStatus.PENDING,
+    trade: overrides.trade ?? 'Plumber',
+    service: overrides.service ?? 'Pipe repair',
+    budget: overrides.budget ?? 40000,
+    scheduledAt: overrides.scheduledAt ?? DateTime.now().plus({ days: 2 }),
+  })
 }

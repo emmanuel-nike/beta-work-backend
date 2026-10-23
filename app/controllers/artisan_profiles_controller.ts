@@ -5,6 +5,7 @@ import cache from '@adonisjs/cache/services/main'
 import VerificationStatus from '#enums/verification_status'
 import ArtisanProfile from '#models/artisan_profile'
 import LocalPhotoService from '#services/local_photo_service'
+import ArtisanLocationService, { type Coordinates } from '#services/artisan_location_service'
 import {
   updateArtisanPortfolioValidator,
   updateArtisanProfileValidator,
@@ -73,11 +74,64 @@ export default class ArtisanProfilesController {
         }
 
         const paginated = await query.orderBy('created_at', 'desc').paginate(page, limit)
-        return paginated.serialize()
+        const serialized = paginated.serialize()
+        // Attach a stable placeholder distance per artisan (no coordinates yet).
+        serialized.data = paginated.all().map((profile) => ({
+          ...profile.serialize(),
+          distanceKm: ArtisanLocationService.placeholderDistanceKm(profile.userId),
+        }))
+        return serialized
       },
     })
 
     return response.ok(result)
+  }
+
+  /**
+   * Public list of verified, available artisans ordered by proximity ("artisans
+   * near you"). Distance is a stable placeholder until artisans capture their
+   * coordinates; pass `lat`/`lng` to rank by real distance from a point once
+   * both sides have coordinates.
+   */
+  async nearby({ request, response }: HttpContext) {
+    const limit = Math.min(Number(request.input('limit', 10)) || 10, 50)
+    const trade = request.input('trade')
+    const origin = this.parseOrigin(request.input('lat'), request.input('lng'))
+
+    const query = ArtisanProfile.query()
+      .where('verificationStatus', VerificationStatus.APPROVED)
+      .where('isAvailable', true)
+      .preload('user')
+
+    if (trade) {
+      query.whereILike('trade', `%${trade}%`)
+    }
+
+    const profiles = await query
+
+    const data = profiles
+      .map((profile) => ({
+        ...profile.serialize(),
+        distanceKm: ArtisanLocationService.resolveDistanceKm(
+          origin,
+          { latitude: profile.latitude, longitude: profile.longitude },
+          profile.userId
+        ),
+      }))
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, limit)
+
+    return response.ok({ data })
+  }
+
+  /** Parse optional lat/lng query inputs into an origin, or null if absent/invalid. */
+  private parseOrigin(lat: unknown, lng: unknown): Coordinates | null {
+    const latitude = Number(lat)
+    const longitude = Number(lng)
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return null
+    }
+    return { latitude, longitude }
   }
 
   /**
@@ -93,7 +147,12 @@ export default class ArtisanProfilesController {
       return response.notFound({ message: 'Artisan profile not found' })
     }
 
-    return response.ok({ artisanProfile: profile.serialize() })
+    return response.ok({
+      artisanProfile: {
+        ...profile.serialize(),
+        distanceKm: ArtisanLocationService.placeholderDistanceKm(profile.userId),
+      },
+    })
   }
 
   /**

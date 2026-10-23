@@ -69,8 +69,24 @@ export default class ArtisanProfile extends BaseModel {
   @column()
   declare address: string | null
 
+  // pg returns decimals as strings; parse back to numbers for JSON output.
+  @column({ consume: (value: unknown) => (value === null ? null : Number(value)) })
+  declare latitude: number | null
+
+  @column({ consume: (value: unknown) => (value === null ? null : Number(value)) })
+  declare longitude: number | null
+
   @column()
   declare serviceRadiusKm: number | null
+
+  @column({ consume: (value: unknown) => (value === null ? 0 : Number(value)) })
+  declare rating: number
+
+  @column()
+  declare reviewsCount: number
+
+  @column()
+  declare priceFrom: number | null
 
   @column()
   declare isAvailable: boolean

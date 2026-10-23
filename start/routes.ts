@@ -13,6 +13,7 @@ import UserRole from '#enums/user_role'
 
 const AuthController = () => import('#controllers/auth_controller')
 const ArtisanProfilesController = () => import('#controllers/artisan_profiles_controller')
+const BookingsController = () => import('#controllers/bookings_controller')
 const AdminUsersController = () => import('#controllers/admin/users_controller')
 const AdminArtisansController = () => import('#controllers/admin/artisans_controller')
 
@@ -42,6 +43,9 @@ router
         router.put('/auth/me', [AuthController, 'updateProfile'])
         router.put('/auth/password', [AuthController, 'changePassword'])
 
+        router.get('/bookings', [BookingsController, 'index'])
+        router.get('/bookings/:id', [BookingsController, 'show'])
+
         router
           .group(() => {
             router.get('/artisan/profile', [ArtisanProfilesController, 'mine'])
@@ -66,6 +70,7 @@ router
       .use(middleware.auth())
 
     router.get('/artisans', [ArtisanProfilesController, 'index'])
+    router.get('/artisans/nearby', [ArtisanProfilesController, 'nearby'])
     router.get('/artisans/:id', [ArtisanProfilesController, 'show'])
     router.get('/uploads/artisans/:fileName', [ArtisanProfilesController, 'photo'])
   })
