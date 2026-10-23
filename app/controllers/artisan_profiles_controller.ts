@@ -153,6 +153,7 @@ export default class ArtisanProfilesController {
       ...profile.serialize(),
       rating: profile.rating,
       priceFrom: profile.priceFrom,
+      priceTo: profile.priceTo,
       distanceKm: ArtisanLocationService.resolveDistanceKm(
         origin,
         { latitude: profile.latitude, longitude: profile.longitude },
@@ -438,6 +439,9 @@ export default class ArtisanProfilesController {
     }
     if (payload.servicePricing !== undefined) {
       profile.servicePricing = payload.servicePricing
+      const bounds = ArtisanProfile.computePriceBounds(payload.servicePricing)
+      profile.priceFrom = bounds.priceFrom
+      profile.priceTo = bounds.priceTo
     }
     if (payload.weeklySchedule !== undefined) {
       profile.weeklySchedule = payload.weeklySchedule

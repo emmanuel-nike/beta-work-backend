@@ -448,7 +448,12 @@ export default class extends BaseSeeder {
       // placeholder distance until they do.
       const rating = Number((4 + ((index * 7) % 10) / 10).toFixed(2))
       const reviewsCount = 18 + ((index * 13) % 160)
+      const servicePricing = ArtisanProfile.defaultServicePricing(data.trade)
+      // Keep seeded listing variety while still anchoring service pricing.
       const priceFrom = 5000 + ((index * 3) % 8) * 2500
+      const priceTo = priceFrom + 15000
+      servicePricing[0].minPrice = priceFrom
+      servicePricing[0].maxPrice = priceTo
 
       await ArtisanProfile.updateOrCreate(
         { userId: user.id },
@@ -464,7 +469,9 @@ export default class extends BaseSeeder {
           serviceRadiusKm: data.serviceRadiusKm,
           rating,
           reviewsCount,
+          servicePricing,
           priceFrom,
+          priceTo,
           isAvailable: true,
           nin: data.nin,
           bvn: data.bvn,

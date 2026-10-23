@@ -60,6 +60,7 @@ export async function createArtisan(
     rating: number
     reviewsCount: number
     priceFrom: number | null
+    priceTo: number | null
   }> = {}
 ) {
   const user =
@@ -69,9 +70,13 @@ export async function createArtisan(
       email: uniqueEmail('artisan'),
     }))
 
+  const trade = overrides.trade ?? 'Plumber'
+  const servicePricing = ArtisanProfile.defaultServicePricing(trade)
+  const bounds = ArtisanProfile.computePriceBounds(servicePricing)
+
   const profile = await ArtisanProfile.create({
     userId: user.id,
-    trade: overrides.trade ?? 'Plumber',
+    trade,
     yearsOfExperience: 3,
     nin: overrides.nin ?? uniqueDigits(11),
     bvn: overrides.bvn ?? uniqueDigits(11),
@@ -79,7 +84,9 @@ export async function createArtisan(
     verificationStatus: overrides.verificationStatus ?? VerificationStatus.APPROVED,
     rating: overrides.rating ?? 0,
     reviewsCount: overrides.reviewsCount ?? 0,
-    priceFrom: overrides.priceFrom ?? null,
+    servicePricing,
+    priceFrom: overrides.priceFrom ?? bounds.priceFrom,
+    priceTo: overrides.priceTo ?? bounds.priceTo,
     isAvailable: true,
   })
 

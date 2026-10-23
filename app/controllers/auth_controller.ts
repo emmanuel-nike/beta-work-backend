@@ -345,6 +345,8 @@ export default class AuthController {
 
       if (role === UserRole.ARTISAN && payload.artisanProfile && photoUrl) {
         const guarantor = payload.artisanProfile.guarantor
+        const servicePricing = ArtisanProfile.defaultServicePricing(payload.artisanProfile.trade)
+        const bounds = ArtisanProfile.computePriceBounds(servicePricing)
 
         await ArtisanProfile.create(
           {
@@ -369,6 +371,9 @@ export default class AuthController {
             verificationDocumentUrl: payload.artisanProfile.verificationDocumentUrl ?? null,
             verificationStatus: VerificationStatus.PENDING,
             isAvailable: true,
+            servicePricing,
+            priceFrom: bounds.priceFrom,
+            priceTo: bounds.priceTo,
           },
           { client: trx }
         )

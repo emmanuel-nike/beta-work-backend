@@ -142,11 +142,16 @@ test.group('Artisan & Admin API', (group) => {
           trade: 'Carpenter',
           guarantorFullName: 'Guarantor Person',
           verificationStatus: VerificationStatus.PENDING,
+          priceFrom: 1000,
+          priceTo: 10000,
         },
       },
     })
     assert.match(response.body().user.artisanProfile.photoUrl, /^\/api\/v1\/uploads\/artisans\//)
     assert.equal(response.body().user.artisanProfile.verificationStatus, 'pending')
+    assert.deepEqual(response.body().user.artisanProfile.servicePricing, [
+      { service: 'Carpenter', minPrice: 1000, maxPrice: 10000 },
+    ])
   })
 })
 

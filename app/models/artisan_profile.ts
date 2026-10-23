@@ -89,7 +89,41 @@ export default class ArtisanProfile extends BaseModel {
   declare priceFrom: number | null
 
   @column()
+  declare priceTo: number | null
+
+  @column()
   declare isAvailable: boolean
+
+  /**
+   * Default single-service pricing for a newly registered artisan.
+   */
+  static defaultServicePricing(trade: string): ServicePrice[] {
+    return [{ service: trade, minPrice: 1000, maxPrice: 10000 }]
+  }
+
+  /**
+   * Derive listing price bounds from per-service min/max prices.
+   */
+  static computePriceBounds(pricing: ServicePrice[] | null | undefined): {
+    priceFrom: number | null
+    priceTo: number | null
+  } {
+    if (!pricing?.length) {
+      return { priceFrom: null, priceTo: null }
+    }
+
+    const mins = pricing
+      .map((item) => item.minPrice)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+    const maxs = pricing
+      .map((item) => item.maxPrice)
+      .filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
+
+    return {
+      priceFrom: mins.length > 0 ? Math.min(...mins) : null,
+      priceTo: maxs.length > 0 ? Math.max(...maxs) : null,
+    }
+  }
 
   @column()
   declare nin: string

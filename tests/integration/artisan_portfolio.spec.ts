@@ -71,6 +71,8 @@ test.group('Artisan portfolio API', (group) => {
     assert.deepEqual(refreshed.additionalServices, ['Plumber', 'Carpenter'])
     assert.deepEqual(refreshed.languages, ['English', 'Yoruba'])
     assert.deepEqual(refreshed.servicePricing, servicePricing)
+    assert.equal(refreshed.priceFrom, 3000)
+    assert.equal(refreshed.priceTo, 120000)
     assert.deepEqual(refreshed.weeklySchedule, weeklySchedule)
   })
 
