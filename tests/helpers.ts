@@ -57,6 +57,9 @@ export async function createArtisan(
     bvn: string
     photoUrl: string
     verificationStatus: VerificationStatus
+    rating: number
+    reviewsCount: number
+    priceFrom: number | null
   }> = {}
 ) {
   const user =
@@ -74,6 +77,9 @@ export async function createArtisan(
     bvn: overrides.bvn ?? uniqueDigits(11),
     photoUrl: overrides.photoUrl ?? '/api/v1/uploads/artisans/test.jpg',
     verificationStatus: overrides.verificationStatus ?? VerificationStatus.APPROVED,
+    rating: overrides.rating ?? 0,
+    reviewsCount: overrides.reviewsCount ?? 0,
+    priceFrom: overrides.priceFrom ?? null,
     isAvailable: true,
   })
 

@@ -6,6 +6,10 @@ import VerificationStatus from '#enums/verification_status'
 import ArtisanProfile from '#models/artisan_profile'
 import LocalPhotoService from '#services/local_photo_service'
 import ArtisanLocationService, { type Coordinates } from '#services/artisan_location_service'
+
+/** Sort options the client's artisan list exposes. */
+const ARTISAN_SORTS = ['nearest', 'top-rated', 'lowest-price'] as const
+type ArtisanSort = (typeof ARTISAN_SORTS)[number]
 import {
   updateArtisanPortfolioValidator,
   updateArtisanProfileValidator,
@@ -89,13 +93,25 @@ export default class ArtisanProfilesController {
 
   /**
    * Public list of verified, available artisans ordered by proximity ("artisans
-   * near you"). Distance is a stable placeholder until artisans capture their
-   * coordinates; pass `lat`/`lng` to rank by real distance from a point once
-   * both sides have coordinates.
+   * near you"), with the filters the client's artisan list exposes.
+   *
+   * Query params (all optional):
+   * - `q`            text search across trade, business name, and artisan name
+   * - `trade`        narrow to a trade (kept for back-compat)
+   * - `category`     reserved: artisans are not categorised in the schema yet,
+   *                  so this is accepted but not applied until a taxonomy exists
+   * - `sort`         `nearest` (default) | `top-rated` | `lowest-price`
+   * - `minRating`    minimum aggregate rating
+   * - `minPrice` / `maxPrice`         price-from bounds (naira)
+   * - `minDistanceKm` / `maxDistanceKm`  distance bounds (km)
+   * - `lat` / `lng`  origin for real distance once coordinates exist
+   * - `limit`        max results (default 20, capped at 50)
+   *
+   * Distance is a stable placeholder until artisans capture coordinates, so
+   * distance filtering and sorting happen in memory on the derived value.
    */
   async nearby({ request, response }: HttpContext) {
-    const limit = Math.min(Number(request.input('limit', 10)) || 10, 50)
-    const trade = request.input('trade')
+    const filters = this.parseNearbyFilters(request)
     const origin = this.parseOrigin(request.input('lat'), request.input('lng'))
 
     const query = ArtisanProfile.query()
@@ -103,25 +119,101 @@ export default class ArtisanProfilesController {
       .where('isAvailable', true)
       .preload('user')
 
-    if (trade) {
-      query.whereILike('trade', `%${trade}%`)
+    if (filters.q) {
+      const term = `%${filters.q}%`
+      query.where((builder) => {
+        builder
+          .whereILike('trade', term)
+          .orWhereILike('business_name', term)
+          .orWhereHas('user', (userQuery) => {
+            userQuery.whereILike('first_name', term).orWhereILike('last_name', term)
+          })
+      })
+    }
+
+    if (filters.trade) {
+      query.whereILike('trade', `%${filters.trade}%`)
+    }
+
+    if (filters.minRating > 0) {
+      query.where('rating', '>=', filters.minRating)
+    }
+
+    if (filters.minPrice !== null) {
+      query.where('price_from', '>=', filters.minPrice)
+    }
+
+    if (filters.maxPrice !== null) {
+      query.where('price_from', '<=', filters.maxPrice)
     }
 
     const profiles = await query
 
-    const data = profiles
-      .map((profile) => ({
-        ...profile.serialize(),
-        distanceKm: ArtisanLocationService.resolveDistanceKm(
-          origin,
-          { latitude: profile.latitude, longitude: profile.longitude },
-          profile.userId
-        ),
-      }))
-      .sort((a, b) => a.distanceKm - b.distanceKm)
-      .slice(0, limit)
+    let ranked = profiles.map((profile) => ({
+      ...profile.serialize(),
+      rating: profile.rating,
+      priceFrom: profile.priceFrom,
+      distanceKm: ArtisanLocationService.resolveDistanceKm(
+        origin,
+        { latitude: profile.latitude, longitude: profile.longitude },
+        profile.userId
+      ),
+    }))
 
-    return response.ok({ data })
+    if (filters.minDistanceKm !== null) {
+      ranked = ranked.filter((item) => item.distanceKm >= filters.minDistanceKm!)
+    }
+    if (filters.maxDistanceKm !== null) {
+      ranked = ranked.filter((item) => item.distanceKm <= filters.maxDistanceKm!)
+    }
+
+    ranked.sort(this.comparatorFor(filters.sort))
+
+    return response.ok({ data: ranked.slice(0, filters.limit) })
+  }
+
+  private parseNearbyFilters(request: HttpContext['request']) {
+    const text = (value: unknown) => {
+      const trimmed = (value ?? '').toString().trim()
+      return trimmed.length > 0 ? trimmed : null
+    }
+    const numberOrNull = (value: unknown) => {
+      const parsed = Number(value)
+      return Number.isFinite(parsed) ? parsed : null
+    }
+
+    const sortInput = (request.input('sort') ?? '').toString()
+    const sort: ArtisanSort = ARTISAN_SORTS.includes(sortInput as ArtisanSort)
+      ? (sortInput as ArtisanSort)
+      : 'nearest'
+
+    return {
+      q: text(request.input('q')),
+      trade: text(request.input('trade')),
+      // Accepted for forward compatibility; not applied until artisans carry a
+      // category in the schema (today they only have a free-text trade).
+      category: text(request.input('category')),
+      sort,
+      minRating: Math.max(0, numberOrNull(request.input('minRating')) ?? 0),
+      minPrice: numberOrNull(request.input('minPrice')),
+      maxPrice: numberOrNull(request.input('maxPrice')),
+      minDistanceKm: numberOrNull(request.input('minDistanceKm')),
+      maxDistanceKm: numberOrNull(request.input('maxDistanceKm')),
+      limit: Math.min(Number(request.input('limit', 20)) || 20, 50),
+    }
+  }
+
+  private comparatorFor(sort: ArtisanSort) {
+    type Ranked = { rating: number; priceFrom: number | null; distanceKm: number }
+    if (sort === 'top-rated') {
+      return (a: Ranked, b: Ranked) => b.rating - a.rating || a.distanceKm - b.distanceKm
+    }
+    if (sort === 'lowest-price') {
+      return (a: Ranked, b: Ranked) =>
+        (a.priceFrom ?? Number.POSITIVE_INFINITY) - (b.priceFrom ?? Number.POSITIVE_INFINITY) ||
+        a.distanceKm - b.distanceKm
+    }
+    return (a: Ranked, b: Ranked) => a.distanceKm - b.distanceKm
   }
 
   /** Parse optional lat/lng query inputs into an origin, or null if absent/invalid. */
