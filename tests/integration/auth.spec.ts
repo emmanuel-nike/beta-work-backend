@@ -159,7 +159,7 @@ test.group('Auth API', (group) => {
     response.assertBodyContains({ message: 'Invalid or expired OTP' })
   })
 
-  test('POST /auth/password/forgot returns 200 with no otp for unknown email', async ({
+  test('POST /auth/password/forgot returns 404 for an unknown email', async ({
     client,
     assert,
   }) => {
@@ -167,7 +167,7 @@ test.group('Auth API', (group) => {
       .post('/api/v1/auth/password/forgot')
       .json({ email: uniqueEmail('nobody') })
 
-    response.assertStatus(200)
+    response.assertStatus(404)
     assert.isUndefined(response.body().otp)
   })
 
