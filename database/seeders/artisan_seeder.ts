@@ -425,7 +425,7 @@ export default class extends BaseSeeder {
       }
     )
 
-    for (const data of ARTISANS) {
+    for (const [index, data] of ARTISANS.entries()) {
       const user = await User.updateOrCreate(
         { email: data.email },
         {
@@ -443,6 +443,13 @@ export default class extends BaseSeeder {
 
       const isApproved = data.verificationStatus === VerificationStatus.APPROVED
 
+      // Deterministic listing metadata. Coordinates are intentionally left null:
+      // artisans have not captured their location yet, so the API serves a
+      // placeholder distance until they do.
+      const rating = Number((4 + ((index * 7) % 10) / 10).toFixed(2))
+      const reviewsCount = 18 + ((index * 13) % 160)
+      const priceFrom = 5000 + ((index * 3) % 8) * 2500
+
       await ArtisanProfile.updateOrCreate(
         { userId: user.id },
         {
@@ -455,6 +462,9 @@ export default class extends BaseSeeder {
           state: data.state,
           address: data.address,
           serviceRadiusKm: data.serviceRadiusKm,
+          rating,
+          reviewsCount,
+          priceFrom,
           isAvailable: true,
           nin: data.nin,
           bvn: data.bvn,

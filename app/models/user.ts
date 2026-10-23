@@ -41,6 +41,14 @@ export default class User extends compose(BaseModel, AuthFinder) {
   @column()
   declare address: string | null
 
+  // pg returns decimals as strings; parse back to numbers so the API serializes
+  // coordinates as JSON numbers.
+  @column({ consume: (value: unknown) => (value === null ? null : Number(value)) })
+  declare latitude: number | null
+
+  @column({ consume: (value: unknown) => (value === null ? null : Number(value)) })
+  declare longitude: number | null
+
   @column()
   declare role: UserRole
 
