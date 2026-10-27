@@ -64,6 +64,25 @@ export const updateArtisanPortfolioValidator = vine.compile(
   })
 )
 
+/**
+ * Validates an admin request to convert an existing user into an artisan.
+ * Only the trade is required; everything else falls back to the user's own
+ * details or sensible defaults, and the artisan completes the rest of their
+ * profile during onboarding.
+ */
+export const convertToArtisanValidator = vine.compile(
+  vine.object({
+    trade: vine.string().trim().minLength(1).maxLength(120),
+    businessName: vine.string().trim().maxLength(150).nullable().optional(),
+    bio: vine.string().trim().maxLength(2000).nullable().optional(),
+    yearsOfExperience: vine.number().min(0).max(80).optional(),
+    city: vine.string().trim().maxLength(100).nullable().optional(),
+    state: vine.string().trim().maxLength(100).nullable().optional(),
+    address: vine.string().trim().maxLength(255).nullable().optional(),
+    serviceRadiusKm: vine.number().min(0).nullable().optional(),
+  })
+)
+
 export const verifyArtisanValidator = vine.compile(
   vine.object({
     verificationStatus: vine.enum([

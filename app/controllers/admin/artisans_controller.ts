@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon'
 import type { HttpContext } from '@adonisjs/core/http'
 import cache from '@adonisjs/cache/services/main'
+import UserRole from '#enums/user_role'
 import VerificationStatus from '#enums/verification_status'
 import ArtisanProfile from '#models/artisan_profile'
 import { verifyArtisanValidator } from '#validators/artisan_profile'
@@ -42,6 +43,13 @@ export default class ArtisansController {
     if (payload.verificationStatus === VerificationStatus.APPROVED) {
       profile.verifiedAt = DateTime.now()
       profile.verifiedBy = admin.id
+
+      // Activating an artisan also guarantees they carry the artisan role, in
+      // case the profile was created before the role was applied.
+      if (profile.user.role !== UserRole.ARTISAN) {
+        profile.user.role = UserRole.ARTISAN
+        await profile.user.save()
+      }
     } else {
       profile.verifiedAt = null
       profile.verifiedBy = null

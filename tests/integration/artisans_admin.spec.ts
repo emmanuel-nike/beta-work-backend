@@ -2,6 +2,7 @@ import { test } from '@japa/runner'
 import testUtils from '@adonisjs/core/services/test_utils'
 import UserRole from '#enums/user_role'
 import VerificationStatus from '#enums/verification_status'
+import ArtisanProfile from '#models/artisan_profile'
 import User from '#models/user'
 import { createArtisan, createUser, uniqueDigits, uniqueEmail, uniquePhone } from '#tests/helpers'
 
@@ -72,6 +73,105 @@ test.group('Artisan & Admin API', (group) => {
     })
   })
 
+  test('admin can convert a user into an artisan', async ({ client, assert }) => {
+    const admin = await createUser({
+      role: UserRole.ADMIN,
+      email: uniqueEmail('admin-convert'),
+      phoneNumber: uniquePhone('+23485'),
+    })
+    const member = await createUser({
+      role: UserRole.USER,
+      email: uniqueEmail('member-convert'),
+      phoneNumber: uniquePhone('+23486'),
+      city: 'Ibadan',
+      state: 'Oyo',
+    })
+    const token = await issueToken(admin)
+
+    const response = await client
+      .post(`/api/v1/admin/users/${member.id}/convert-to-artisan`)
+      .bearerToken(token)
+      .json({ trade: 'Plumber', yearsOfExperience: 5 })
+
+    response.assertStatus(201)
+    response.assertBodyContains({
+      user: {
+        id: member.id,
+        role: UserRole.ARTISAN,
+        artisanProfile: {
+          trade: 'Plumber',
+          yearsOfExperience: 5,
+          verificationStatus: VerificationStatus.PENDING,
+          // Seeded from the user's own location when not provided.
+          city: 'Ibadan',
+          state: 'Oyo',
+        },
+      },
+    })
+
+    const profile = await ArtisanProfile.findBy('userId', member.id)
+    assert.isNotNull(profile)
+    assert.equal(profile!.verificationStatus, VerificationStatus.PENDING)
+
+    const reloaded = await User.findOrFail(member.id)
+    assert.equal(reloaded.role, UserRole.ARTISAN)
+  })
+
+  test('converting a user who is already an artisan returns 409', async ({ client }) => {
+    const admin = await createUser({
+      role: UserRole.ADMIN,
+      email: uniqueEmail('admin-convert2'),
+      phoneNumber: uniquePhone('+23487'),
+    })
+    const { user } = await createArtisan({ verificationStatus: VerificationStatus.APPROVED })
+    const token = await issueToken(admin)
+
+    const response = await client
+      .post(`/api/v1/admin/users/${user.id}/convert-to-artisan`)
+      .bearerToken(token)
+      .json({ trade: 'Painter' })
+
+    response.assertStatus(409)
+  })
+
+  test('convert-to-artisan requires a trade', async ({ client }) => {
+    const admin = await createUser({
+      role: UserRole.ADMIN,
+      email: uniqueEmail('admin-convert3'),
+      phoneNumber: uniquePhone('+23488'),
+    })
+    const member = await createUser({
+      role: UserRole.USER,
+      email: uniqueEmail('member-convert3'),
+      phoneNumber: uniquePhone('+23489'),
+    })
+    const token = await issueToken(admin)
+
+    const response = await client
+      .post(`/api/v1/admin/users/${member.id}/convert-to-artisan`)
+      .bearerToken(token)
+      .json({})
+
+    response.assertStatus(422)
+  })
+
+  test('non-admin cannot convert a user into an artisan', async ({ client }) => {
+    const member = await createUser({ role: UserRole.USER })
+    const target = await createUser({
+      role: UserRole.USER,
+      email: uniqueEmail('target-convert'),
+      phoneNumber: uniquePhone('+23490'),
+    })
+    const token = await issueToken(member)
+
+    const response = await client
+      .post(`/api/v1/admin/users/${target.id}/convert-to-artisan`)
+      .bearerToken(token)
+      .json({ trade: 'Plumber' })
+
+    response.assertStatus(403)
+  })
+
   test('admin can verify an artisan', async ({ client }) => {
     const admin = await createUser({ role: UserRole.ADMIN, email: uniqueEmail('admin2') })
     const { profile } = await createArtisan({
@@ -96,6 +196,47 @@ test.group('Artisan & Admin API', (group) => {
         verificationStatus: VerificationStatus.APPROVED,
       },
     })
+  })
+
+  test('verifying a pending artisan activates the artisan role', async ({ client, assert }) => {
+    const admin = await createUser({
+      role: UserRole.ADMIN,
+      email: uniqueEmail('admin-activate'),
+      phoneNumber: uniquePhone('+23491'),
+    })
+    // A user still on the base role but holding a pending artisan profile.
+    const member = await createUser({
+      role: UserRole.USER,
+      email: uniqueEmail('member-activate'),
+      phoneNumber: uniquePhone('+23492'),
+    })
+    const profile = await ArtisanProfile.create({
+      userId: member.id,
+      trade: 'Welder',
+      yearsOfExperience: 2,
+      nin: uniqueDigits(11),
+      bvn: uniqueDigits(11),
+      verificationStatus: VerificationStatus.PENDING,
+      isAvailable: true,
+    })
+    const token = await issueToken(admin)
+
+    const response = await client
+      .patch(`/api/v1/admin/artisans/${profile.id}/verification`)
+      .bearerToken(token)
+      .json({ verificationStatus: VerificationStatus.APPROVED })
+
+    response.assertStatus(200)
+    response.assertBodyContains({
+      artisanProfile: {
+        id: profile.id,
+        verificationStatus: VerificationStatus.APPROVED,
+        verifiedBy: admin.id,
+      },
+    })
+
+    const reloaded = await User.findOrFail(member.id)
+    assert.equal(reloaded.role, UserRole.ARTISAN)
   })
 
   test('POST /auth/register creates an artisan with guarantor and photo', async ({

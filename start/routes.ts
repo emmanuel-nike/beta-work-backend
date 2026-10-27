@@ -60,6 +60,7 @@ router
             router.get('/users', [AdminUsersController, 'index'])
             router.get('/users/:id', [AdminUsersController, 'show'])
             router.patch('/users/:id/role', [AdminUsersController, 'updateRole'])
+            router.post('/users/:id/convert-to-artisan', [AdminUsersController, 'convertToArtisan'])
 
             router.get('/artisans', [AdminArtisansController, 'index'])
             router.patch('/artisans/:id/verification', [AdminArtisansController, 'verify'])

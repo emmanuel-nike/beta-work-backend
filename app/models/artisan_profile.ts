@@ -132,7 +132,7 @@ export default class ArtisanProfile extends BaseModel {
   declare bvn: string
 
   @column()
-  declare photoUrl: string
+  declare photoUrl: string | null
 
   @column()
   declare guarantorFullName: string | null
