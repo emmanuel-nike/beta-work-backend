@@ -112,7 +112,7 @@ test.group('Artisan portfolio API', (group) => {
     response.assertStatus(200)
 
     const refreshed = await ArtisanProfile.findOrFail(profile.id)
-    assert.match(refreshed.photoUrl, /^\/api\/v1\/uploads\/artisans\//)
+    assert.match(refreshed.photoUrl!, /^\/api\/v1\/uploads\/artisans\//)
     assert.isArray(refreshed.portfolioImages)
     assert.lengthOf(refreshed.portfolioImages!, 1)
     assert.match(refreshed.portfolioImages![0], /^\/api\/v1\/uploads\/artisans\//)
