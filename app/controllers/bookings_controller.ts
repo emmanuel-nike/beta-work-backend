@@ -1,8 +1,12 @@
 import type { HttpContext } from '@adonisjs/core/http'
+import { DateTime } from 'luxon'
 import BookingStatus from '#enums/booking_status'
+import VerificationStatus from '#enums/verification_status'
 import Booking from '#models/booking'
+import ArtisanProfile from '#models/artisan_profile'
 import User from '#models/user'
 import ArtisanLocationService, { type Coordinates } from '#services/artisan_location_service'
+import { createBookingValidator } from '#validators/booking'
 
 const BOOKING_STATUSES = Object.values(BookingStatus) as string[]
 
@@ -30,6 +34,59 @@ export default class BookingsController {
     const origin = this.originFrom(user)
     return response.ok({
       data: bookings.map((booking) => this.serializeBooking(booking, origin)),
+    })
+  }
+
+  /**
+   * Create a booking request for an approved artisan. The caller is the client;
+   * the artisan is resolved from the public profile id, and the booking opens in
+   * the `pending` state for the artisan to accept.
+   */
+  async store({ auth, request, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(createBookingValidator)
+
+    const profile = await ArtisanProfile.query()
+      .where('id', payload.artisanProfileId)
+      .preload('user')
+      .first()
+
+    if (!profile || profile.verificationStatus !== VerificationStatus.APPROVED) {
+      return response.notFound({ message: 'Artisan not found' })
+    }
+
+    if (profile.userId === user.id) {
+      return response.badRequest({ message: 'You cannot book yourself' })
+    }
+
+    let scheduledAt: DateTime | null = null
+    if (payload.scheduledAt) {
+      scheduledAt = DateTime.fromISO(payload.scheduledAt)
+      if (!scheduledAt.isValid) {
+        return response.unprocessableEntity({ message: 'Invalid scheduled date' })
+      }
+    }
+
+    const booking = await Booking.create({
+      clientId: user.id,
+      artisanId: profile.userId,
+      status: BookingStatus.PENDING,
+      trade: profile.trade,
+      service: payload.service,
+      jobDescription: payload.jobDescription,
+      budget: payload.budget ?? null,
+      languages: payload.languages ?? null,
+      messageToArtisan: payload.messageToArtisan ?? null,
+      scheduledAt,
+      location: payload.location ?? null,
+      address: payload.address ?? null,
+      awaitingConfirmation: false,
+    })
+
+    await booking.load('artisan', (artisanQuery) => artisanQuery.preload('artisanProfile'))
+
+    return response.created({
+      booking: this.serializeBooking(booking, this.originFrom(user)),
     })
   }
 
