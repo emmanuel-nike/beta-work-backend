@@ -1,0 +1,175 @@
+# Admin: convert a user to an artisan, then activate (verify) them
+#
+# Live-tested against the production API on 2026-10-27 using the seeded admin
+# account. Each step lists the request (method, path, headers, body) and the
+# actual response that was returned.
+#
+# All admin endpoints require:
+#   - a valid bearer token (obtained from POST /auth/login)
+#   - the authenticated user to have role "admin"
+# They are mounted under the /api/v1 prefix.
+
+meta:
+  baseUrl: http://127.0.0.1:4444/api/v1 # container port 4444 -> app 3333
+  testedOn: 2026-10-27
+  subject:
+    userId: 5
+    email: gigiadoghe@yahoo.com
+    name: Gigi Adoghe
+  notes:
+    - Tech details below were randomly chosen for the test.
+    - Only `trade` is required by the convert endpoint; everything else is optional.
+
+steps:
+  # ---------------------------------------------------------------------------
+  # 1. Authenticate as an admin to obtain a bearer token.
+  # ---------------------------------------------------------------------------
+  - name: Admin login
+    request:
+      method: POST
+      path: /auth/login
+      headers:
+        Content-Type: application/json
+      body:
+        email: admin@betawork.app # seeded admin (database/seeders/admin_seeder.ts)
+        password: password123
+    response:
+      status: 200
+      body:
+        type: bearer
+        value: "oat_...<redacted>..." # use this as `Authorization: Bearer <value>`
+        expiresAt: "2026-11-26T04:26:30.478Z"
+        user:
+          id: 6
+          firstName: BetaWork
+          lastName: Admin
+          email: admin@betawork.app
+          role: admin
+          artisanProfile: null
+
+  # ---------------------------------------------------------------------------
+  # 2. Convert the user into an artisan.
+  #    Promotes role to "artisan" and provisions a PENDING artisan profile in
+  #    one transaction. City/state/address and coordinates fall back to the
+  #    user's own details when omitted; service pricing/price bounds default.
+  # ---------------------------------------------------------------------------
+  - name: Convert user to artisan
+    request:
+      method: POST
+      path: /admin/users/5/convert-to-artisan
+      headers:
+        Authorization: Bearer <admin-token>
+        Content-Type: application/json
+      body:
+        trade: Electrician
+        businessName: Gigi Power Solutions
+        bio: >-
+          Certified residential and commercial electrician handling wiring,
+          fault diagnosis and solar backup installations.
+        yearsOfExperience: 7
+        city: Lagos
+        state: Lagos
+        address: 15 Marina Road, Lagos Island
+        serviceRadiusKm: 25
+    response:
+      status: 201
+      body:
+        user:
+          id: 5
+          firstName: Gigi
+          lastName: Adoghe
+          email: gigiadoghe@yahoo.com
+          phoneNumber: "+2348055516665"
+          city: null
+          state: null
+          address: Flat 5 , No 5 , Maria Caibo Close , Maitama , Abuja
+          role: artisan # <- promoted
+          latitude: null
+          longitude: null
+          createdAt: "2026-09-02T19:08:12.087+01:00"
+          updatedAt: "2026-10-27T05:39:58.183+01:00"
+          artisanProfile:
+            id: 17
+            userId: 5
+            businessName: Gigi Power Solutions
+            trade: Electrician
+            bio: >-
+              Certified residential and commercial electrician handling wiring,
+              fault diagnosis and solar backup installations.
+            yearsOfExperience: 7
+            city: Lagos
+            state: Lagos
+            address: 15 Marina Road, Lagos Island
+            serviceRadiusKm: "25.00"
+            isAvailable: true
+            nin: null
+            bvn: null
+            photoUrl: null # supplied later during artisan onboarding
+            verificationStatus: pending # <- awaiting activation
+            verificationNotes: null
+            verifiedAt: null
+            verifiedBy: null
+            servicePricing:
+              - service: Electrician
+                minPrice: 1000
+                maxPrice: 10000
+            priceFrom: 1000
+            priceTo: 10000
+            rating: 0
+            reviewsCount: 0
+            createdAt: "2026-10-27T05:39:58.187+01:00"
+            updatedAt: "2026-10-27T05:39:58.187+01:00"
+    errors:
+      "409": User already has an artisan profile
+      "422": Validation failed (e.g. missing `trade`)
+      "403": Authenticated user is not an admin
+      "404": User id not found
+
+  # ---------------------------------------------------------------------------
+  # 3. Activate (verify) the artisan.
+  #    Setting status to "approved" stamps verifiedAt/verifiedBy and guarantees
+  #    the user carries the artisan role. The profile id (17) comes from step 2.
+  # ---------------------------------------------------------------------------
+  - name: Activate / verify artisan
+    request:
+      method: PATCH
+      path: /admin/artisans/17/verification
+      headers:
+        Authorization: Bearer <admin-token>
+        Content-Type: application/json
+      body:
+        verificationStatus: approved # one of: approved | rejected | pending
+        verificationNotes: Verified via admin activation test on 2026-10-27.
+    response:
+      status: 200
+      body:
+        artisanProfile:
+          id: 17
+          userId: 5
+          trade: Electrician
+          businessName: Gigi Power Solutions
+          verificationStatus: approved # <- activated
+          verificationNotes: Verified via admin activation test on 2026-10-27.
+          verifiedAt: "2026-10-27T05:40:23.935+01:00"
+          verifiedBy: 6 # admin user id
+          isAvailable: true
+          priceFrom: 1000
+          priceTo: 10000
+          updatedAt: "2026-10-27T05:40:23.935+01:00"
+          user:
+            id: 5
+            firstName: Gigi
+            lastName: Adoghe
+            email: gigiadoghe@yahoo.com
+            role: artisan
+    errors:
+      "422": Validation failed (invalid verificationStatus)
+      "403": Authenticated user is not an admin
+      "404": Artisan profile id not found
+
+outcome:
+  summary: >-
+    gigiadoghe@yahoo.com (user 5) was converted to an artisan (profile 17,
+    pending) and then activated to verificationStatus=approved. Both endpoints
+    returned success and the user now has role=artisan with an approved,
+    available artisan profile that will surface in public artisan listings.
