@@ -37,7 +37,11 @@ export default class extends BaseSchema {
           .from(this.tableName)
           .where('id', row.id)
           .update({
-            service_pricing: db.raw('?::jsonb', [JSON.stringify(pricing)]),
+            // Pass a JSON string, not `db.raw(...)`: a Lucid raw wrapper used as
+            // an update *value* is not unwrapped by the driver and would be
+            // stored literally (`{"sql":"?::jsonb","bindings":[...]}`). Postgres
+            // casts the bound text to jsonb for the jsonb column.
+            service_pricing: JSON.stringify(pricing),
             price_from: priceFrom,
             price_to: priceTo,
             updated_at: new Date(),
