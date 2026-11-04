@@ -18,3 +18,20 @@ export const createBookingValidator = vine.compile(
     address: vine.string().trim().maxLength(255).nullable().optional(),
   })
 )
+
+/**
+ * Validates an edit to an existing booking. Every field is optional so the
+ * client can send only what changed; the artisan cannot be reassigned here.
+ */
+export const updateBookingValidator = vine.compile(
+  vine.object({
+    service: vine.string().trim().minLength(1).maxLength(150).optional(),
+    jobDescription: vine.string().trim().minLength(1).maxLength(2000).optional(),
+    scheduledAt: vine.string().trim().nullable().optional(),
+    budget: vine.number().min(0).nullable().optional(),
+    languages: vine.string().trim().maxLength(120).nullable().optional(),
+    messageToArtisan: vine.string().trim().maxLength(2000).nullable().optional(),
+    location: vine.string().trim().maxLength(255).nullable().optional(),
+    address: vine.string().trim().maxLength(255).nullable().optional(),
+  })
+)
