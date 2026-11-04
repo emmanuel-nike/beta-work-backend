@@ -6,7 +6,7 @@ import Booking from '#models/booking'
 import ArtisanProfile from '#models/artisan_profile'
 import User from '#models/user'
 import ArtisanLocationService, { type Coordinates } from '#services/artisan_location_service'
-import { createBookingValidator } from '#validators/booking'
+import { createBookingValidator, updateBookingValidator } from '#validators/booking'
 
 const BOOKING_STATUSES = Object.values(BookingStatus) as string[]
 
@@ -109,6 +109,69 @@ export default class BookingsController {
     return response.ok({ booking: this.serializeBooking(booking, this.originFrom(user)) })
   }
 
+  /**
+   * Edit a booking the authenticated client owns. Only pending bookings (not yet
+   * accepted by the artisan) can be changed; the artisan cannot be reassigned.
+   */
+  async update({ auth, params, request, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const payload = await request.validateUsing(updateBookingValidator)
+
+    const booking = await Booking.query()
+      .where('id', params.id)
+      .where('clientId', user.id)
+      .preload('artisan', (artisanQuery) => artisanQuery.preload('artisanProfile'))
+      .first()
+
+    if (!booking) {
+      return response.notFound({ message: 'Booking not found' })
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      return response.badRequest({ message: 'Only pending bookings can be edited' })
+    }
+
+    if (payload.scheduledAt !== undefined) {
+      if (payload.scheduledAt === null) {
+        booking.scheduledAt = null
+      } else {
+        const scheduledAt = DateTime.fromISO(payload.scheduledAt)
+        if (!scheduledAt.isValid) {
+          return response.unprocessableEntity({ message: 'Invalid scheduled date' })
+        }
+        booking.scheduledAt = scheduledAt
+      }
+    }
+
+    if (payload.service !== undefined) {
+      booking.service = payload.service
+    }
+    if (payload.jobDescription !== undefined) {
+      booking.jobDescription = payload.jobDescription
+    }
+    if (payload.budget !== undefined) {
+      booking.budget = payload.budget
+    }
+    if (payload.languages !== undefined) {
+      booking.languages = payload.languages
+    }
+    if (payload.messageToArtisan !== undefined) {
+      booking.messageToArtisan = payload.messageToArtisan
+    }
+    if (payload.location !== undefined) {
+      booking.location = payload.location
+    }
+    if (payload.address !== undefined) {
+      booking.address = payload.address
+    }
+
+    await booking.save()
+
+    return response.ok({
+      booking: this.serializeBooking(booking, this.originFrom(user)),
+    })
+  }
+
   private originFrom(user: User): Coordinates | null {
     if (user.latitude === null || user.longitude === null) {
       return null
@@ -148,7 +211,9 @@ export default class BookingsController {
       cancelledAt: booking.cancelledAt?.toISO() ?? null,
       createdAt: booking.createdAt?.toISO() ?? null,
       artisan: {
-        id: booking.artisanId,
+        // The public artisan profile id (what the client books against), not
+        // the owning user id, so the client can reopen the booking form.
+        id: profile?.id ?? booking.artisanId,
         name: artisan ? `${artisan.firstName} ${artisan.lastName}`.trim() : null,
         trade: profile?.trade ?? booking.trade,
         photoUrl: profile?.photoUrl ?? null,

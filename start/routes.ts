@@ -46,6 +46,7 @@ router
         router.get('/bookings', [BookingsController, 'index'])
         router.post('/bookings', [BookingsController, 'store'])
         router.get('/bookings/:id', [BookingsController, 'show'])
+        router.patch('/bookings/:id', [BookingsController, 'update'])
 
         router
           .group(() => {
