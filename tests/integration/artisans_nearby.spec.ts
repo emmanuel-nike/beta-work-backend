@@ -116,4 +116,49 @@ test.group('Artisans nearby API', (group) => {
     const ascending = [...prices].sort((a, b) => a - b)
     assert.deepEqual(prices, ascending)
   })
+
+  test('GET /artisans/:id returns the public profile and hides identity documents', async ({
+    client,
+    assert,
+  }) => {
+    const { user, profile } = await createArtisan({
+      trade: 'Electrician',
+      rating: 4.5,
+      reviewsCount: 12,
+    })
+    profile.bio = 'Fixes wiring.'
+    profile.businessName = 'Bright Sparks'
+    profile.city = 'Ikeja'
+    profile.languages = ['English', 'Yoruba']
+    await profile.save()
+
+    const response = await client.get(`/api/v1/artisans/${profile.id}`)
+    response.assertStatus(200)
+
+    const body = response.body().artisanProfile
+    assert.equal(body.trade, 'Electrician')
+    assert.equal(body.bio, 'Fixes wiring.')
+    assert.equal(body.businessName, 'Bright Sparks')
+    assert.equal(body.rating, 4.5)
+    assert.equal(body.reviewsCount, 12)
+    assert.deepEqual(body.languages, ['English', 'Yoruba'])
+    assert.equal(body.user.firstName, user.firstName)
+    assert.equal(body.user.lastName, user.lastName)
+    assert.isNumber(body.distanceKm)
+    assert.notProperty(body, 'nin')
+    assert.notProperty(body, 'bvn')
+    assert.notProperty(body, 'guarantorPhoneNumber')
+    assert.notProperty(body, 'guarantorEmail')
+    assert.notProperty(body.user, 'email')
+    assert.notProperty(body.user, 'phoneNumber')
+  })
+
+  test('GET /artisans/:id hides artisans who are not approved', async ({ client }) => {
+    const { profile } = await createArtisan({
+      verificationStatus: VerificationStatus.PENDING,
+    })
+
+    const response = await client.get(`/api/v1/artisans/${profile.id}`)
+    response.assertStatus(404)
+  })
 })

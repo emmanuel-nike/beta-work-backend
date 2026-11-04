@@ -79,11 +79,13 @@ export default class ArtisanProfilesController {
 
         const paginated = await query.orderBy('created_at', 'desc').paginate(page, limit)
         const serialized = paginated.serialize()
-        // Attach a stable placeholder distance per artisan (no coordinates yet).
-        serialized.data = paginated.all().map((profile) => ({
-          ...profile.serialize(),
-          distanceKm: ArtisanLocationService.placeholderDistanceKm(profile.userId),
-        }))
+        // Public listing only: drop identity documents and guarantor details.
+        serialized.data = paginated.all().map((profile) =>
+          this.toPublicArtisan(
+            profile,
+            ArtisanLocationService.placeholderDistanceKm(profile.userId)
+          )
+        )
         return serialized
       },
     })
@@ -149,17 +151,16 @@ export default class ArtisanProfilesController {
 
     const profiles = await query
 
-    let ranked = profiles.map((profile) => ({
-      ...profile.serialize(),
-      rating: profile.rating,
-      priceFrom: profile.priceFrom,
-      priceTo: profile.priceTo,
-      distanceKm: ArtisanLocationService.resolveDistanceKm(
-        origin,
-        { latitude: profile.latitude, longitude: profile.longitude },
-        profile.userId
-      ),
-    }))
+    let ranked = profiles.map((profile) =>
+      this.toPublicArtisan(
+        profile,
+        ArtisanLocationService.resolveDistanceKm(
+          origin,
+          { latitude: profile.latitude, longitude: profile.longitude },
+          profile.userId
+        )
+      )
+    )
 
     if (filters.minDistanceKm !== null) {
       ranked = ranked.filter((item) => item.distanceKm >= filters.minDistanceKm!)
@@ -241,11 +242,56 @@ export default class ArtisanProfilesController {
     }
 
     return response.ok({
-      artisanProfile: {
-        ...profile.serialize(),
-        distanceKm: ArtisanLocationService.placeholderDistanceKm(profile.userId),
-      },
+      artisanProfile: this.toPublicArtisan(
+        profile,
+        ArtisanLocationService.resolveDistanceKm(
+          null,
+          { latitude: profile.latitude, longitude: profile.longitude },
+          profile.userId
+        )
+      ),
     })
+  }
+
+  /**
+   * Fields a client may show on a public artisan page. Identity documents,
+   * guarantor contacts, and the account email/phone stay off this payload.
+   */
+  private toPublicArtisan(profile: ArtisanProfile, distanceKm: number) {
+    return {
+      id: profile.id,
+      businessName: profile.businessName,
+      trade: profile.trade,
+      bio: profile.bio,
+      yearsOfExperience: profile.yearsOfExperience,
+      city: profile.city,
+      state: profile.state,
+      address: profile.address,
+      latitude: profile.latitude,
+      longitude: profile.longitude,
+      serviceRadiusKm: profile.serviceRadiusKm,
+      rating: profile.rating,
+      reviewsCount: profile.reviewsCount,
+      priceFrom: profile.priceFrom,
+      priceTo: profile.priceTo,
+      isAvailable: profile.isAvailable,
+      photoUrl: profile.photoUrl,
+      hasCertificate: Boolean(profile.certificateUrl),
+      additionalServices: profile.additionalServices,
+      languages: profile.languages,
+      portfolioImages: profile.portfolioImages,
+      servicePricing: profile.servicePricing,
+      minimumLeadTimeHours: profile.minimumLeadTimeHours,
+      weeklySchedule: profile.weeklySchedule,
+      verificationStatus: profile.verificationStatus,
+      distanceKm,
+      user: profile.user
+        ? {
+            firstName: profile.user.firstName,
+            lastName: profile.user.lastName,
+          }
+        : null,
+    }
   }
 
   /**
