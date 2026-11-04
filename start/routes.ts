@@ -44,6 +44,7 @@ router
         router.put('/auth/password', [AuthController, 'changePassword'])
 
         router.get('/bookings', [BookingsController, 'index'])
+        router.post('/bookings', [BookingsController, 'store'])
         router.get('/bookings/:id', [BookingsController, 'show'])
 
         router
