@@ -72,6 +72,126 @@ test.group('Bookings API', (group) => {
     response.assertStatus(200)
     assert.lengthOf(response.body().data, 0)
   })
+
+  test('POST /bookings creates a pending booking with a status timeline', async ({
+    client,
+    assert,
+  }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const { profile } = await createArtisan({ trade: 'Electrician' })
+
+    const token = await issueToken(customer)
+    const response = await client
+      .post('/api/v1/bookings')
+      .json({
+        artisanProfileId: profile.id,
+        service: 'Rewiring',
+        jobDescription: 'Replace the kitchen wiring.',
+      })
+      .bearerToken(token)
+
+    response.assertStatus(201)
+    const booking = response.body().booking
+    assert.equal(booking.status, BookingStatus.PENDING)
+    assert.equal(booking.service, 'Rewiring')
+    // Timeline: request sent is done; reviewing is pending (reached, awaiting
+    // the artisan); later stages are inactive (not reached).
+    assert.lengthOf(booking.timeline, 5)
+    assert.equal(booking.timeline[0].key, 'request-sent')
+    assert.equal(booking.timeline[0].state, 'done')
+    assert.equal(booking.timeline[1].state, 'pending')
+    assert.equal(booking.timeline[2].state, 'inactive')
+  })
+
+  test('POST /bookings stores and returns the service location coordinates', async ({
+    client,
+    assert,
+  }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const { profile } = await createArtisan({ trade: 'Electrician' })
+
+    const token = await issueToken(customer)
+    const response = await client
+      .post('/api/v1/bookings')
+      .json({
+        artisanProfileId: profile.id,
+        service: 'Rewiring',
+        jobDescription: 'Replace the kitchen wiring.',
+        location: 'Current location',
+        latitude: 6.5244,
+        longitude: 3.3792,
+      })
+      .bearerToken(token)
+
+    response.assertStatus(201)
+    const booking = response.body().booking
+    assert.equal(booking.latitude, 6.5244)
+    assert.equal(booking.longitude, 3.3792)
+  })
+
+  test('PATCH /bookings/:id edits a pending booking', async ({ client, assert }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const booking = await createBooking({
+      client: customer,
+      status: BookingStatus.PENDING,
+      service: 'Pipe repair',
+    })
+
+    const token = await issueToken(customer)
+    const response = await client
+      .patch(`/api/v1/bookings/${booking.id}`)
+      .json({ service: 'Pipe replacement', jobDescription: 'Replace the burst pipe.' })
+      .bearerToken(token)
+
+    response.assertStatus(200)
+    assert.equal(response.body().booking.service, 'Pipe replacement')
+    assert.equal(response.body().booking.jobDescription, 'Replace the burst pipe.')
+  })
+
+  test('PATCH /bookings/:id rejects editing a non-pending booking', async ({ client, assert }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const booking = await createBooking({
+      client: customer,
+      status: BookingStatus.ACCEPTED,
+      service: 'Pipe repair',
+    })
+
+    const token = await issueToken(customer)
+    const response = await client
+      .patch(`/api/v1/bookings/${booking.id}`)
+      .json({ service: 'Too late to change' })
+      .bearerToken(token)
+
+    response.assertStatus(400)
+    await booking.refresh()
+    assert.equal(booking.service, 'Pipe repair')
+  })
+
+  test('PATCH /bookings/:id cannot edit another client booking', async ({ client }) => {
+    const owner = await createUser({ role: UserRole.USER })
+    const intruder = await createUser({ role: UserRole.USER })
+    const booking = await createBooking({ client: owner, status: BookingStatus.PENDING })
+
+    const token = await issueToken(intruder)
+    const response = await client
+      .patch(`/api/v1/bookings/${booking.id}`)
+      .json({ service: 'Hijack attempt' })
+      .bearerToken(token)
+
+    response.assertStatus(404)
+  })
+
+  test('timeline reflects a completed booking as fully done', async ({ client, assert }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    await createBooking({ client: customer, status: BookingStatus.COMPLETED })
+
+    const token = await issueToken(customer)
+    const response = await client.get('/api/v1/bookings').bearerToken(token)
+
+    response.assertStatus(200)
+    const timeline = response.body().data[0].timeline
+    assert.isTrue(timeline.every((step: { state: string }) => step.state === 'done'))
+  })
 })
 
 async function issueToken(user: User) {
