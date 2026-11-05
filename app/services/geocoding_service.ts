@@ -4,6 +4,7 @@ import type { HttpContext } from '@adonisjs/core/http'
 
 const AUTOCOMPLETE_URL = 'https://maps.googleapis.com/maps/api/place/autocomplete/json'
 const DETAILS_URL = 'https://maps.googleapis.com/maps/api/place/details/json'
+const GEOCODE_URL = 'https://maps.googleapis.com/maps/api/geocode/json'
 
 export interface AddressPrediction {
   placeId: string
@@ -93,6 +94,31 @@ export default class GeocodingService {
       address: body.result?.formatted_address ?? '',
       latitude: location.lat,
       longitude: location.lng,
+    }
+  }
+
+  /**
+   * Reverse geocode coordinates to a formatted address (Geocoding API). Returns
+   * the coordinates with an empty address when Google finds no match.
+   */
+  static async reverse(latitude: number, longitude: number): Promise<ResolvedPlace> {
+    const params = new URLSearchParams({
+      latlng: `${latitude},${longitude}`,
+      key: this.apiKey(),
+      language: 'en',
+    })
+
+    const body = await this.request(`${GEOCODE_URL}?${params.toString()}`)
+    if (body.status === 'ZERO_RESULTS') {
+      return { address: '', latitude, longitude }
+    }
+    this.assertOk(body)
+
+    const results = Array.isArray(body.results) ? body.results : []
+    return {
+      address: results[0]?.formatted_address ?? '',
+      latitude,
+      longitude,
     }
   }
 

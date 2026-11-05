@@ -22,4 +22,17 @@ export default class GeocodingController {
     const place = await GeocodingService.placeDetails(params.placeId, sessionToken)
     return response.ok({ data: place })
   }
+
+  /**
+   * Reverse geocode coordinates to an address: `GET /geocoding/reverse?lat=&lng=`.
+   */
+  async reverse({ request, response }: HttpContext) {
+    const latitude = Number(request.input('lat'))
+    const longitude = Number(request.input('lng'))
+    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) {
+      return response.unprocessableEntity({ message: 'Invalid coordinates' })
+    }
+    const place = await GeocodingService.reverse(latitude, longitude)
+    return response.ok({ data: place })
+  }
 }

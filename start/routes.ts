@@ -51,6 +51,7 @@ router
 
         router.get('/geocoding/autocomplete', [GeocodingController, 'autocomplete'])
         router.get('/geocoding/place/:placeId', [GeocodingController, 'place'])
+        router.get('/geocoding/reverse', [GeocodingController, 'reverse'])
 
         router
           .group(() => {
