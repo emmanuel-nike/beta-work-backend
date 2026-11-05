@@ -15,6 +15,7 @@ const AuthController = () => import('#controllers/auth_controller')
 const ArtisanProfilesController = () => import('#controllers/artisan_profiles_controller')
 const BookingsController = () => import('#controllers/bookings_controller')
 const GeocodingController = () => import('#controllers/geocoding_controller')
+const AddressesController = () => import('#controllers/addresses_controller')
 const AdminUsersController = () => import('#controllers/admin/users_controller')
 const AdminArtisansController = () => import('#controllers/admin/artisans_controller')
 
@@ -52,6 +53,9 @@ router
         router.get('/geocoding/autocomplete', [GeocodingController, 'autocomplete'])
         router.get('/geocoding/place/:placeId', [GeocodingController, 'place'])
         router.get('/geocoding/reverse', [GeocodingController, 'reverse'])
+
+        router.get('/addresses', [AddressesController, 'index'])
+        router.post('/addresses', [AddressesController, 'store'])
 
         router
           .group(() => {

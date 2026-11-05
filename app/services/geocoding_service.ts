@@ -16,10 +16,19 @@ export interface AddressPrediction {
 }
 
 export interface ResolvedPlace {
+  /** Full formatted address, e.g. "12 Allen Ave, Ikeja, Lagos, Nigeria". */
   address: string
+  /** Street-level line, e.g. "12 Allen Avenue". */
+  line1: string
+  city: string
+  state: string
+  postalCode: string | null
   latitude: number
   longitude: number
 }
+
+/** A normalized address component (name + its Google types). */
+type AddressComponent = { value: string; types: string[] }
 
 /**
  * Raised when geocoding fails. 503 when the key is not configured, 502 when
@@ -86,7 +95,7 @@ export default class GeocodingService {
 
     const url = `${PLACE_DETAILS_URL}/${encodeURIComponent(placeId)}?${params.toString()}`
     // The field mask is required by Place Details (New); request only what we use.
-    const body = await this.get(url, 'id,formattedAddress,location')
+    const body = await this.get(url, 'id,formattedAddress,location,addressComponents')
 
     const location = body.location
     if (
@@ -97,8 +106,17 @@ export default class GeocodingService {
       throw new GeocodingException('Place has no coordinates', 502)
     }
 
+    const formatted = body.formattedAddress ?? ''
+    const components = (Array.isArray(body.addressComponents) ? body.addressComponents : []).map(
+      (component: { longText?: string; shortText?: string; types?: string[] }) => ({
+        value: component.longText ?? component.shortText ?? '',
+        types: component.types ?? [],
+      })
+    )
+
     return {
-      address: body.formattedAddress ?? '',
+      address: formatted,
+      ...this.extractParts(components, formatted),
       latitude: location.latitude,
       longitude: location.longitude,
     }
@@ -117,15 +135,51 @@ export default class GeocodingService {
 
     const body = await this.requestLegacy(`${GEOCODE_URL}?${params.toString()}`)
     if (body.status === 'ZERO_RESULTS') {
-      return { address: '', latitude, longitude }
+      return { address: '', line1: '', city: '', state: '', postalCode: null, latitude, longitude }
     }
     this.assertLegacyOk(body)
 
     const results = Array.isArray(body.results) ? body.results : []
+    const top = results[0] ?? {}
+    const formatted = top.formatted_address ?? ''
+    const components = (Array.isArray(top.address_components) ? top.address_components : []).map(
+      (component: { long_name?: string; short_name?: string; types?: string[] }) => ({
+        value: component.long_name ?? component.short_name ?? '',
+        types: component.types ?? [],
+      })
+    )
+
     return {
-      address: results[0]?.formatted_address ?? '',
+      address: formatted,
+      ...this.extractParts(components, formatted),
       latitude,
       longitude,
+    }
+  }
+
+  /**
+   * Split address components into the parts the client stores: a street line,
+   * city/town, state, and postcode. `line1` falls back to the first segment of
+   * the formatted address when no street number/route is present.
+   */
+  private static extractParts(
+    components: AddressComponent[],
+    formatted: string
+  ): { line1: string; city: string; state: string; postalCode: string | null } {
+    const find = (type: string) => components.find((c) => c.types.includes(type))?.value ?? ''
+
+    const line1 = [find('street_number'), find('route')].filter(Boolean).join(' ')
+    const city =
+      find('locality') ||
+      find('administrative_area_level_2') ||
+      find('sublocality_level_1') ||
+      find('sublocality')
+
+    return {
+      line1: line1 || formatted.split(',')[0]?.trim() || '',
+      city,
+      state: find('administrative_area_level_1'),
+      postalCode: find('postal_code') || null,
     }
   }
 
