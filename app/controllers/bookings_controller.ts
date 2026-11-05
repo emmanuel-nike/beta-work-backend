@@ -1,14 +1,10 @@
 import type { HttpContext } from '@adonisjs/core/http'
-import { DateTime } from 'luxon'
-import BookingStatus from '#enums/booking_status'
-import VerificationStatus from '#enums/verification_status'
 import Booking from '#models/booking'
-import ArtisanProfile from '#models/artisan_profile'
 import User from '#models/user'
 import ArtisanLocationService, { type Coordinates } from '#services/artisan_location_service'
+import BookingService from '#services/booking_service'
+import BookingTimelineService from '#services/booking_timeline_service'
 import { createBookingValidator, updateBookingValidator } from '#validators/booking'
-
-const BOOKING_STATUSES = Object.values(BookingStatus) as string[]
 
 export default class BookingsController {
   /**
@@ -17,19 +13,7 @@ export default class BookingsController {
    */
   async index({ auth, request, response }: HttpContext) {
     const user = auth.getUserOrFail()
-
-    const query = Booking.query()
-      .where('clientId', user.id)
-      .preload('artisan', (artisanQuery) => artisanQuery.preload('artisanProfile'))
-      .orderBy('scheduledAt', 'desc')
-      .orderBy('createdAt', 'desc')
-
-    const status = request.input('status')
-    if (status && BOOKING_STATUSES.includes(status)) {
-      query.where('status', status)
-    }
-
-    const bookings = await query
+    const bookings = await BookingService.listForClient(user, request.input('status'))
 
     const origin = this.originFrom(user)
     return response.ok({
@@ -45,45 +29,7 @@ export default class BookingsController {
   async store({ auth, request, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const payload = await request.validateUsing(createBookingValidator)
-
-    const profile = await ArtisanProfile.query()
-      .where('id', payload.artisanProfileId)
-      .preload('user')
-      .first()
-
-    if (!profile || profile.verificationStatus !== VerificationStatus.APPROVED) {
-      return response.notFound({ message: 'Artisan not found' })
-    }
-
-    if (profile.userId === user.id) {
-      return response.badRequest({ message: 'You cannot book yourself' })
-    }
-
-    let scheduledAt: DateTime | null = null
-    if (payload.scheduledAt) {
-      scheduledAt = DateTime.fromISO(payload.scheduledAt)
-      if (!scheduledAt.isValid) {
-        return response.unprocessableEntity({ message: 'Invalid scheduled date' })
-      }
-    }
-
-    const booking = await Booking.create({
-      clientId: user.id,
-      artisanId: profile.userId,
-      status: BookingStatus.PENDING,
-      trade: profile.trade,
-      service: payload.service,
-      jobDescription: payload.jobDescription,
-      budget: payload.budget ?? null,
-      languages: payload.languages ?? null,
-      messageToArtisan: payload.messageToArtisan ?? null,
-      scheduledAt,
-      location: payload.location ?? null,
-      address: payload.address ?? null,
-      awaitingConfirmation: false,
-    })
-
-    await booking.load('artisan', (artisanQuery) => artisanQuery.preload('artisanProfile'))
+    const booking = await BookingService.createForClient(user, payload)
 
     return response.created({
       booking: this.serializeBooking(booking, this.originFrom(user)),
@@ -95,12 +41,7 @@ export default class BookingsController {
    */
   async show({ auth, params, response }: HttpContext) {
     const user = auth.getUserOrFail()
-
-    const booking = await Booking.query()
-      .where('id', params.id)
-      .where('clientId', user.id)
-      .preload('artisan', (artisanQuery) => artisanQuery.preload('artisanProfile'))
-      .first()
+    const booking = await BookingService.findForClient(user, params.id)
 
     if (!booking) {
       return response.notFound({ message: 'Booking not found' })
@@ -116,56 +57,7 @@ export default class BookingsController {
   async update({ auth, params, request, response }: HttpContext) {
     const user = auth.getUserOrFail()
     const payload = await request.validateUsing(updateBookingValidator)
-
-    const booking = await Booking.query()
-      .where('id', params.id)
-      .where('clientId', user.id)
-      .preload('artisan', (artisanQuery) => artisanQuery.preload('artisanProfile'))
-      .first()
-
-    if (!booking) {
-      return response.notFound({ message: 'Booking not found' })
-    }
-
-    if (booking.status !== BookingStatus.PENDING) {
-      return response.badRequest({ message: 'Only pending bookings can be edited' })
-    }
-
-    if (payload.scheduledAt !== undefined) {
-      if (payload.scheduledAt === null) {
-        booking.scheduledAt = null
-      } else {
-        const scheduledAt = DateTime.fromISO(payload.scheduledAt)
-        if (!scheduledAt.isValid) {
-          return response.unprocessableEntity({ message: 'Invalid scheduled date' })
-        }
-        booking.scheduledAt = scheduledAt
-      }
-    }
-
-    if (payload.service !== undefined) {
-      booking.service = payload.service
-    }
-    if (payload.jobDescription !== undefined) {
-      booking.jobDescription = payload.jobDescription
-    }
-    if (payload.budget !== undefined) {
-      booking.budget = payload.budget
-    }
-    if (payload.languages !== undefined) {
-      booking.languages = payload.languages
-    }
-    if (payload.messageToArtisan !== undefined) {
-      booking.messageToArtisan = payload.messageToArtisan
-    }
-    if (payload.location !== undefined) {
-      booking.location = payload.location
-    }
-    if (payload.address !== undefined) {
-      booking.address = payload.address
-    }
-
-    await booking.save()
+    const booking = await BookingService.updateForClient(user, params.id, payload)
 
     return response.ok({
       booking: this.serializeBooking(booking, this.originFrom(user)),
@@ -210,6 +102,7 @@ export default class BookingsController {
       cancellationReason: booking.cancellationReason,
       cancelledAt: booking.cancelledAt?.toISO() ?? null,
       createdAt: booking.createdAt?.toISO() ?? null,
+      timeline: BookingTimelineService.build(booking),
       artisan: {
         // The public artisan profile id (what the client books against), not
         // the owning user id, so the client can reopen the booking form.
