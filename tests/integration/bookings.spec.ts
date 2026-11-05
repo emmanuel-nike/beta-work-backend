@@ -18,7 +18,7 @@ test.group('Bookings API', (group) => {
     assert,
   }) => {
     const customer = await createUser({ role: UserRole.USER })
-    const { user: artisan } = await createArtisan({ trade: 'Electrician' })
+    const { user: artisan, profile } = await createArtisan({ trade: 'Electrician' })
     await createBooking({
       client: customer,
       artisan,
@@ -33,7 +33,8 @@ test.group('Bookings API', (group) => {
     const bookings = response.body().data
     assert.lengthOf(bookings, 1)
     assert.equal(bookings[0].service, 'Rewiring')
-    assert.equal(bookings[0].artisan.id, artisan.id)
+    // The public profile id the client books against, not the owning user id.
+    assert.equal(bookings[0].artisan.id, profile.id)
     assert.equal(bookings[0].artisan.trade, 'Electrician')
     // A distance is always surfaced (placeholder until coordinates exist).
     assert.isNumber(bookings[0].artisan.distanceKm)
