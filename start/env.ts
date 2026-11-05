@@ -52,7 +52,7 @@ export default await Env.create(new URL('../', import.meta.url), {
   | Google Maps Platform (address autocomplete + geocoding)
   |----------------------------------------------------------
   | Optional so the app boots without it; the geocoding endpoints return 503
-  | when it is not set. Enable the Places API + Geocoding API for this key.
+  | when it is not set. Enable the Places API (New) + Geocoding API for this key.
   */
   GOOGLE_MAPS_API_KEY: Env.schema.string.optional(),
 })
