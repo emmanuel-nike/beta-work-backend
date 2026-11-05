@@ -15,7 +15,7 @@ export default class extends BaseSchema {
         .onDelete('CASCADE')
 
       table.string('formatted_address', 500).notNullable()
-      table.string('line1', 255).notNullable().defaultTo('')
+      table.string('line_1', 255).notNullable().defaultTo('')
       table.string('city', 120).notNullable().defaultTo('')
       table.string('state', 120).notNullable().defaultTo('')
       table.string('postal_code', 20).nullable()
