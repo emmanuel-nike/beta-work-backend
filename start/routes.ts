@@ -14,6 +14,7 @@ import UserRole from '#enums/user_role'
 const AuthController = () => import('#controllers/auth_controller')
 const ArtisanProfilesController = () => import('#controllers/artisan_profiles_controller')
 const BookingsController = () => import('#controllers/bookings_controller')
+const GeocodingController = () => import('#controllers/geocoding_controller')
 const AdminUsersController = () => import('#controllers/admin/users_controller')
 const AdminArtisansController = () => import('#controllers/admin/artisans_controller')
 
@@ -47,6 +48,9 @@ router
         router.post('/bookings', [BookingsController, 'store'])
         router.get('/bookings/:id', [BookingsController, 'show'])
         router.patch('/bookings/:id', [BookingsController, 'update'])
+
+        router.get('/geocoding/autocomplete', [GeocodingController, 'autocomplete'])
+        router.get('/geocoding/place/:placeId', [GeocodingController, 'place'])
 
         router
           .group(() => {

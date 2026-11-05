@@ -103,6 +103,32 @@ test.group('Bookings API', (group) => {
     assert.equal(booking.timeline[2].state, 'inactive')
   })
 
+  test('POST /bookings stores and returns the service location coordinates', async ({
+    client,
+    assert,
+  }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const { profile } = await createArtisan({ trade: 'Electrician' })
+
+    const token = await issueToken(customer)
+    const response = await client
+      .post('/api/v1/bookings')
+      .json({
+        artisanProfileId: profile.id,
+        service: 'Rewiring',
+        jobDescription: 'Replace the kitchen wiring.',
+        location: 'Current location',
+        latitude: 6.5244,
+        longitude: 3.3792,
+      })
+      .bearerToken(token)
+
+    response.assertStatus(201)
+    const booking = response.body().booking
+    assert.equal(booking.latitude, 6.5244)
+    assert.equal(booking.longitude, 3.3792)
+  })
+
   test('PATCH /bookings/:id edits a pending booking', async ({ client, assert }) => {
     const customer = await createUser({ role: UserRole.USER })
     const booking = await createBooking({

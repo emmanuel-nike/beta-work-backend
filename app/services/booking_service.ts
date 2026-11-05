@@ -19,6 +19,8 @@ export interface CreateBookingInput {
   messageToArtisan?: string | null
   location?: string | null
   address?: string | null
+  latitude?: number | null
+  longitude?: number | null
 }
 
 /** Editable fields of a booking; every field is optional. */
@@ -31,6 +33,8 @@ export interface UpdateBookingInput {
   messageToArtisan?: string | null
   location?: string | null
   address?: string | null
+  latitude?: number | null
+  longitude?: number | null
 }
 
 /**
@@ -96,6 +100,8 @@ export default class BookingService {
       scheduledAt: this.parseScheduledAt(input.scheduledAt),
       location: input.location ?? null,
       address: input.address ?? null,
+      latitude: input.latitude ?? null,
+      longitude: input.longitude ?? null,
       awaitingConfirmation: false,
     })
 
@@ -145,6 +151,12 @@ export default class BookingService {
     }
     if (input.address !== undefined) {
       booking.address = input.address
+    }
+    if (input.latitude !== undefined) {
+      booking.latitude = input.latitude
+    }
+    if (input.longitude !== undefined) {
+      booking.longitude = input.longitude
     }
 
     await booking.save()

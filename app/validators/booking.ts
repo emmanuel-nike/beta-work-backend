@@ -16,6 +16,8 @@ export const createBookingValidator = vine.compile(
     messageToArtisan: vine.string().trim().maxLength(2000).nullable().optional(),
     location: vine.string().trim().maxLength(255).nullable().optional(),
     address: vine.string().trim().maxLength(255).nullable().optional(),
+    latitude: vine.number().min(-90).max(90).nullable().optional(),
+    longitude: vine.number().min(-180).max(180).nullable().optional(),
   })
 )
 
@@ -33,5 +35,7 @@ export const updateBookingValidator = vine.compile(
     messageToArtisan: vine.string().trim().maxLength(2000).nullable().optional(),
     location: vine.string().trim().maxLength(255).nullable().optional(),
     address: vine.string().trim().maxLength(255).nullable().optional(),
+    latitude: vine.number().min(-90).max(90).nullable().optional(),
+    longitude: vine.number().min(-180).max(180).nullable().optional(),
   })
 )

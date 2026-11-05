@@ -97,6 +97,8 @@ export default class BookingsController {
       scheduledAt: booking.scheduledAt?.toISO() ?? null,
       location: booking.location,
       address: booking.address,
+      latitude: booking.latitude,
+      longitude: booking.longitude,
       awaitingConfirmation: booking.awaitingConfirmation,
       cancelledBy: booking.cancelledBy,
       cancellationReason: booking.cancellationReason,

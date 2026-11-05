@@ -46,4 +46,13 @@ export default await Env.create(new URL('../', import.meta.url), {
   SMTP_PASSWORD: Env.schema.string.optional(),
   MAIL_FROM_ADDRESS: Env.schema.string.optional(),
   MAIL_FROM_NAME: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Google Maps Platform (address autocomplete + geocoding)
+  |----------------------------------------------------------
+  | Optional so the app boots without it; the geocoding endpoints return 503
+  | when it is not set. Enable the Places API + Geocoding API for this key.
+  */
+  GOOGLE_MAPS_API_KEY: Env.schema.string.optional(),
 })
