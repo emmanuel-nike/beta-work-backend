@@ -86,6 +86,73 @@ test.group('Artisan jobs API', (group) => {
 
     response.assertStatus(404)
   })
+
+  test('POST /artisan/jobs/:id/accept marks a pending job accepted', async ({ client, assert }) => {
+    const { user: artisan } = await createArtisan()
+    const booking = await createBooking({ artisan, status: BookingStatus.PENDING })
+
+    const token = await issueToken(artisan)
+    const response = await client
+      .post(`/api/v1/artisan/jobs/${booking.id}/accept`)
+      .bearerToken(token)
+
+    response.assertStatus(200)
+    assert.equal(response.body().job.status, BookingStatus.ACCEPTED)
+    await booking.refresh()
+    assert.equal(booking.status, BookingStatus.ACCEPTED)
+  })
+
+  test('POST /artisan/jobs/:id/decline cancels a pending job', async ({ client, assert }) => {
+    const { user: artisan } = await createArtisan({
+      user: await createUser({
+        role: UserRole.ARTISAN,
+        firstName: 'Tunde',
+        lastName: 'Bakare',
+      }),
+    })
+    const booking = await createBooking({ artisan, status: BookingStatus.PENDING })
+
+    const token = await issueToken(artisan)
+    const response = await client
+      .post(`/api/v1/artisan/jobs/${booking.id}/decline`)
+      .json({ reason: 'Not available that day' })
+      .bearerToken(token)
+
+    response.assertStatus(200)
+    assert.equal(response.body().job.status, BookingStatus.CANCELLED)
+    await booking.refresh()
+    assert.equal(booking.status, BookingStatus.CANCELLED)
+    assert.equal(booking.cancelledBy, 'Tunde Bakare')
+    assert.equal(booking.cancellationReason, 'Not available that day')
+    assert.isNotNull(booking.cancelledAt)
+  })
+
+  test('POST /artisan/jobs/:id/accept rejects a job that is no longer pending', async ({
+    client,
+  }) => {
+    const { user: artisan } = await createArtisan()
+    const booking = await createBooking({ artisan, status: BookingStatus.COMPLETED })
+
+    const token = await issueToken(artisan)
+    const response = await client
+      .post(`/api/v1/artisan/jobs/${booking.id}/accept`)
+      .bearerToken(token)
+
+    response.assertStatus(400)
+  })
+
+  test('POST /artisan/jobs/:id/decline cannot decline another artisan job', async ({ client }) => {
+    const { user: artisan } = await createArtisan()
+    const { user: other } = await createArtisan()
+    const booking = await createBooking({ artisan: other, status: BookingStatus.PENDING })
+
+    const token = await issueToken(artisan)
+    const response = await client
+      .post(`/api/v1/artisan/jobs/${booking.id}/decline`)
+      .bearerToken(token)
+
+    response.assertStatus(404)
+  })
 })
 
 async function issueToken(user: User) {

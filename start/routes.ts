@@ -61,6 +61,8 @@ router
           .group(() => {
             router.get('/artisan/jobs', [BookingsController, 'jobs'])
             router.get('/artisan/jobs/:id', [BookingsController, 'showJob'])
+            router.post('/artisan/jobs/:id/accept', [BookingsController, 'acceptJob'])
+            router.post('/artisan/jobs/:id/decline', [BookingsController, 'declineJob'])
             router.get('/artisan/profile', [ArtisanProfilesController, 'mine'])
             router.get('/artisan/status', [ArtisanProfilesController, 'status'])
             router.put('/artisan/profile', [ArtisanProfilesController, 'update'])

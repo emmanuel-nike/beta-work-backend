@@ -73,6 +73,50 @@ export default class BookingService {
     return Booking.query().where('id', id).where('artisanId', artisan.id).preload('client').first()
   }
 
+  /**
+   * Accept a pending booking assigned to the artisan. Later statuses cannot be
+   * accepted again.
+   */
+  static async acceptForArtisan(artisan: User, id: string | number): Promise<Booking> {
+    const booking = await this.requirePendingJob(artisan, id)
+    booking.status = BookingStatus.ACCEPTED
+    await booking.save()
+    return booking
+  }
+
+  /**
+   * Decline a pending booking. The row becomes cancelled and records who
+   * declined it so the client timeline can explain the outcome.
+   */
+  static async declineForArtisan(
+    artisan: User,
+    id: string | number,
+    reason?: string | null
+  ): Promise<Booking> {
+    const booking = await this.requirePendingJob(artisan, id)
+    booking.status = BookingStatus.CANCELLED
+    booking.cancelledBy = artisan.fullName
+    booking.cancellationReason = reason?.trim() || 'Declined by the artisan'
+    booking.cancelledAt = DateTime.now()
+    await booking.save()
+    return booking
+  }
+
+  /** A pending booking assigned to the artisan, or a domain error. */
+  private static async requirePendingJob(artisan: User, id: string | number): Promise<Booking> {
+    const booking = await this.findForArtisan(artisan, id)
+
+    if (!booking) {
+      throw new BookingException('Job not found', 404)
+    }
+
+    if (booking.status !== BookingStatus.PENDING) {
+      throw new BookingException('Only pending bookings can be updated', 400)
+    }
+
+    return booking
+  }
+
   /** A single booking the client owns, or null. */
   static findForClient(client: User, id: string | number): Promise<Booking | null> {
     return Booking.query()
