@@ -59,6 +59,20 @@ export default class BookingService {
     return query
   }
 
+  /** Bookings assigned to the authenticated artisan, newest scheduled first. */
+  static listForArtisan(artisan: User): Promise<Booking[]> {
+    return Booking.query()
+      .where('artisanId', artisan.id)
+      .preload('client')
+      .orderBy('scheduledAt', 'desc')
+      .orderBy('createdAt', 'desc')
+  }
+
+  /** A single booking assigned to the artisan, or null. */
+  static findForArtisan(artisan: User, id: string | number): Promise<Booking | null> {
+    return Booking.query().where('id', id).where('artisanId', artisan.id).preload('client').first()
+  }
+
   /** A single booking the client owns, or null. */
   static findForClient(client: User, id: string | number): Promise<Booking | null> {
     return Booking.query()

@@ -37,6 +37,35 @@ export default class BookingsController {
   }
 
   /**
+   * List bookings assigned to the authenticated artisan, newest scheduled first.
+   * The caller must have the artisan role (enforced on the route).
+   */
+  async jobs({ auth, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const bookings = await BookingService.listForArtisan(user)
+
+    return response.ok({
+      data: bookings.map((booking) => this.serializeJob(booking, this.originFrom(user))),
+    })
+  }
+
+  /**
+   * Show a single booking assigned to the authenticated artisan.
+   */
+  async showJob({ auth, params, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const booking = await BookingService.findForArtisan(user, params.id)
+
+    if (!booking) {
+      return response.notFound({ message: 'Job not found' })
+    }
+
+    return response.ok({
+      job: this.serializeJob(booking, this.originFrom(user)),
+    })
+  }
+
+  /**
    * Show a single booking the authenticated client owns.
    */
   async show({ auth, params, response }: HttpContext) {
@@ -115,6 +144,43 @@ export default class BookingsController {
         rating: profile?.rating ?? 0,
         reviewsCount: profile?.reviewsCount ?? 0,
         distanceKm,
+      },
+    }
+  }
+
+  /**
+   * Shape a booking for the artisan's My Jobs list: the job fields plus a
+   * compact client summary and the distance from the artisan to the job.
+   */
+  private serializeJob(booking: Booking, origin: Coordinates | null) {
+    const client = booking.client
+    const destination = {
+      latitude: booking.latitude ?? client?.latitude ?? null,
+      longitude: booking.longitude ?? client?.longitude ?? null,
+    }
+    const distanceKm = ArtisanLocationService.resolveDistanceKm(
+      origin,
+      destination,
+      booking.clientId
+    )
+
+    return {
+      id: booking.id,
+      status: booking.status,
+      trade: booking.trade,
+      service: booking.service,
+      jobDescription: booking.jobDescription,
+      budget: booking.budget,
+      messageToArtisan: booking.messageToArtisan,
+      scheduledAt: booking.scheduledAt?.toISO() ?? null,
+      location: booking.location,
+      address: booking.address ?? client?.address ?? null,
+      distanceKm,
+      client: {
+        id: client?.id ?? booking.clientId,
+        name: client ? `${client.firstName} ${client.lastName}`.trim() : null,
+        phone: client?.phoneNumber ?? null,
+        address: booking.address ?? client?.address ?? null,
       },
     }
   }
