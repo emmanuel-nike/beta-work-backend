@@ -102,6 +102,11 @@ test.group('Bookings API', (group) => {
     assert.equal(booking.timeline[0].state, 'done')
     assert.equal(booking.timeline[1].state, 'pending')
     assert.equal(booking.timeline[2].state, 'inactive')
+    // Each step carries the booking's createdAt and its last-updated time (at).
+    for (const step of booking.timeline) {
+      assert.equal(step.createdAt, booking.createdAt)
+      assert.isString(step.at)
+    }
   })
 
   test('POST /bookings stores and returns the service location coordinates', async ({
