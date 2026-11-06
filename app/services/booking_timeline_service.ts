@@ -17,7 +17,9 @@ export interface BookingTimelineStep {
   label: string
   state: TimelineState
   detail: string
-  /** ISO timestamp for the stage event, when known (else null). */
+  /** ISO timestamp of when the booking was created. */
+  createdAt: string | null
+  /** ISO timestamp of when the booking was last updated (its current status). */
   at: string | null
 }
 
@@ -40,15 +42,19 @@ const STEP_LABELS = [
 /**
  * Builds the status timeline for a booking: one entry per stage, each with the
  * state (done / active / pending / cancelled), a label, a short detail line and
- * a timestamp where one exists. The client renders this directly, so the state
- * machine lives here rather than being reconstructed per platform.
+ * the booking's `createdAt` plus `at` (its last-updated time). The client
+ * renders this directly, so the state machine lives here rather than being
+ * reconstructed per platform.
  */
 export default class BookingTimelineService {
   static build(booking: Booking): BookingTimelineStep[] {
     const states = this.statesFor(booking)
     const firstName = booking.artisan?.firstName?.trim() || 'the artisan'
     const createdAt = booking.createdAt?.toISO() ?? null
-    const cancelledAt = booking.cancelledAt?.toISO() ?? null
+    // The booking row carries only create/update timestamps (no per-stage
+    // history), so `at` surfaces the last update — i.e. when the booking
+    // reached its current status.
+    const updatedAt = booking.updatedAt?.toISO() ?? createdAt
 
     return STEP_KEYS.map((key, index) => {
       const state = states[index]
@@ -58,7 +64,8 @@ export default class BookingTimelineService {
         label: key === 'job-accepted' && cancelled ? 'Job cancelled' : STEP_LABELS[index],
         state,
         detail: this.detailFor(key, firstName, cancelled),
-        at: this.timestampFor(key, cancelled, createdAt, cancelledAt),
+        createdAt,
+        at: updatedAt,
       }
     })
   }
@@ -108,20 +115,5 @@ export default class BookingTimelineService {
       default:
         return ''
     }
-  }
-
-  private static timestampFor(
-    key: string,
-    cancelled: boolean,
-    createdAt: string | null,
-    cancelledAt: string | null
-  ): string | null {
-    if (key === 'request-sent') {
-      return createdAt
-    }
-    if (key === 'job-accepted' && cancelled) {
-      return cancelledAt
-    }
-    return null
   }
 }
