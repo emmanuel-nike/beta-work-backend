@@ -66,6 +66,35 @@ export default class BookingsController {
   }
 
   /**
+   * Accept a pending job assigned to the authenticated artisan.
+   */
+  async acceptJob({ auth, params, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const booking = await BookingService.acceptForArtisan(user, params.id)
+
+    return response.ok({
+      job: this.serializeJob(booking, this.originFrom(user)),
+    })
+  }
+
+  /**
+   * Decline a pending job assigned to the authenticated artisan. An optional
+   * `reason` is stored on the cancellation.
+   */
+  async declineJob({ auth, params, request, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const booking = await BookingService.declineForArtisan(
+      user,
+      params.id,
+      request.input('reason')
+    )
+
+    return response.ok({
+      job: this.serializeJob(booking, this.originFrom(user)),
+    })
+  }
+
+  /**
    * Show a single booking the authenticated client owns.
    */
   async show({ auth, params, response }: HttpContext) {
