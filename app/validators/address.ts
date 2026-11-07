@@ -3,6 +3,7 @@ import vine from '@vinejs/vine'
 /** Validates a saved address submitted by the client (from geocoding results). */
 export const saveAddressValidator = vine.compile(
   vine.object({
+    scope: vine.enum(['client', 'artisan']).optional(),
     address: vine.string().trim().minLength(1).maxLength(500),
     line1: vine.string().trim().maxLength(255).optional(),
     city: vine.string().trim().maxLength(120).optional(),
