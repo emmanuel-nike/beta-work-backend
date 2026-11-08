@@ -198,6 +198,68 @@ test.group('Bookings API', (group) => {
     const timeline = response.body().data[0].timeline
     assert.isTrue(timeline.every((step: { state: string }) => step.state === 'done'))
   })
+
+  test('POST /bookings/:id/complete requires authentication', async ({ client }) => {
+    const booking = await createBooking({ status: BookingStatus.ACCEPTED })
+    const response = await client.post(`/api/v1/bookings/${booking.id}/complete`)
+    response.assertStatus(401)
+  })
+
+  test('POST /bookings/:id/complete marks an accepted booking completed', async ({
+    client,
+    assert,
+  }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const booking = await createBooking({ client: customer, status: BookingStatus.ACCEPTED })
+
+    const token = await issueToken(customer)
+    const response = await client.post(`/api/v1/bookings/${booking.id}/complete`).bearerToken(token)
+
+    response.assertStatus(200)
+    assert.equal(response.body().booking.status, BookingStatus.COMPLETED)
+    await booking.refresh()
+    assert.equal(booking.status, BookingStatus.COMPLETED)
+  })
+
+  test('POST /bookings/:id/complete marks an ongoing booking completed', async ({
+    client,
+    assert,
+  }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const booking = await createBooking({ client: customer, status: BookingStatus.ONGOING })
+
+    const token = await issueToken(customer)
+    const response = await client.post(`/api/v1/bookings/${booking.id}/complete`).bearerToken(token)
+
+    response.assertStatus(200)
+    assert.equal(response.body().booking.status, BookingStatus.COMPLETED)
+    await booking.refresh()
+    assert.equal(booking.status, BookingStatus.COMPLETED)
+    assert.isFalse(booking.awaitingConfirmation)
+  })
+
+  test('POST /bookings/:id/complete rejects a pending booking', async ({ client, assert }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const booking = await createBooking({ client: customer, status: BookingStatus.PENDING })
+
+    const token = await issueToken(customer)
+    const response = await client.post(`/api/v1/bookings/${booking.id}/complete`).bearerToken(token)
+
+    response.assertStatus(400)
+    await booking.refresh()
+    assert.equal(booking.status, BookingStatus.PENDING)
+  })
+
+  test('POST /bookings/:id/complete cannot complete another client booking', async ({ client }) => {
+    const owner = await createUser({ role: UserRole.USER })
+    const intruder = await createUser({ role: UserRole.USER })
+    const booking = await createBooking({ client: owner, status: BookingStatus.ACCEPTED })
+
+    const token = await issueToken(intruder)
+    const response = await client.post(`/api/v1/bookings/${booking.id}/complete`).bearerToken(token)
+
+    response.assertStatus(404)
+  })
 })
 
 async function issueToken(user: User) {

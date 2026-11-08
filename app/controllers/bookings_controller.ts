@@ -118,6 +118,19 @@ export default class BookingsController {
     })
   }
 
+  /**
+   * Mark a booking the authenticated client owns as completed. Only an accepted
+   * or ongoing booking can be completed; the client confirms the work is done.
+   */
+  async complete({ auth, params, response }: HttpContext) {
+    const user = auth.getUserOrFail()
+    const booking = await BookingService.completeForClient(user, params.id)
+
+    return response.ok({
+      booking: this.serializeBooking(booking, this.originFrom(user)),
+    })
+  }
+
   private originFrom(user: User): Coordinates | null {
     if (user.latitude === null || user.longitude === null) {
       return null
