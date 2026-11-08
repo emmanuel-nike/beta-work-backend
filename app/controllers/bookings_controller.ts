@@ -83,11 +83,7 @@ export default class BookingsController {
    */
   async declineJob({ auth, params, request, response }: HttpContext) {
     const user = auth.getUserOrFail()
-    const booking = await BookingService.declineForArtisan(
-      user,
-      params.id,
-      request.input('reason')
-    )
+    const booking = await BookingService.declineForArtisan(user, params.id, request.input('reason'))
 
     return response.ok({
       job: this.serializeJob(booking, this.originFrom(user)),

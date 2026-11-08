@@ -85,6 +85,35 @@ test.group('Addresses API', (group) => {
     // Newest first: the last one saved is at the top.
     assert.equal(data[0].address, '12 Test Road, Ikeja, Lagos')
   })
+
+  test('addresses are kept separate per scope', async ({ client, assert }) => {
+    const user = await createUser({ role: UserRole.USER })
+    const token = await issueToken(user)
+
+    await client
+      .post('/api/v1/addresses')
+      .json(addressPayload({ scope: 'client', address: 'Client Rd, Ikeja, Lagos' }))
+      .bearerToken(token)
+    await client
+      .post('/api/v1/addresses')
+      .json(addressPayload({ scope: 'artisan', address: 'Artisan Rd, Ikeja, Lagos' }))
+      .bearerToken(token)
+
+    const clientList = await client
+      .get('/api/v1/addresses')
+      .qs({ scope: 'client' })
+      .bearerToken(token)
+    clientList.assertStatus(200)
+    assert.lengthOf(clientList.body().data, 1)
+    assert.equal(clientList.body().data[0].address, 'Client Rd, Ikeja, Lagos')
+
+    const artisanList = await client
+      .get('/api/v1/addresses')
+      .qs({ scope: 'artisan' })
+      .bearerToken(token)
+    assert.lengthOf(artisanList.body().data, 1)
+    assert.equal(artisanList.body().data[0].address, 'Artisan Rd, Ikeja, Lagos')
+  })
 })
 
 async function issueToken(user: User) {

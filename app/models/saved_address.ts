@@ -1,6 +1,7 @@
 import { DateTime } from 'luxon'
 import { BaseModel, belongsTo, column } from '@adonisjs/lucid/orm'
 import type { BelongsTo } from '@adonisjs/lucid/types/relations'
+import AddressScope from '#enums/address_scope'
 import User from '#models/user'
 
 // pg returns decimals as strings; cast coordinates back to numbers for JSON.
@@ -14,6 +15,10 @@ export default class SavedAddress extends BaseModel {
 
   @column()
   declare userId: number
+
+  /** Which app mode the address belongs to (client / artisan). */
+  @column()
+  declare scope: AddressScope
 
   @column()
   declare formattedAddress: string
