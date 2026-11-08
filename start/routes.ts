@@ -49,6 +49,7 @@ router
         router.post('/bookings', [BookingsController, 'store'])
         router.get('/bookings/:id', [BookingsController, 'show'])
         router.patch('/bookings/:id', [BookingsController, 'update'])
+        router.post('/bookings/:id/complete', [BookingsController, 'complete'])
 
         router.get('/geocoding/autocomplete', [GeocodingController, 'autocomplete'])
         router.get('/geocoding/place/:placeId', [GeocodingController, 'place'])

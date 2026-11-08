@@ -221,6 +221,28 @@ export default class BookingService {
     return booking
   }
 
+  /**
+   * Mark a booking the client owns as completed. The client confirms the work
+   * is done, so only an accepted or ongoing booking can be completed; a pending,
+   * already completed, or cancelled booking is rejected.
+   */
+  static async completeForClient(client: User, id: string | number): Promise<Booking> {
+    const booking = await this.findForClient(client, id)
+
+    if (!booking) {
+      throw new BookingException('Booking not found', 404)
+    }
+
+    if (booking.status !== BookingStatus.ACCEPTED && booking.status !== BookingStatus.ONGOING) {
+      throw new BookingException('Only accepted or ongoing bookings can be completed', 400)
+    }
+
+    booking.status = BookingStatus.COMPLETED
+    booking.awaitingConfirmation = false
+    await booking.save()
+    return booking
+  }
+
   /** Parse an optional ISO slot time, raising a 422 on a malformed value. */
   private static parseScheduledAt(value?: string | null): DateTime | null {
     if (!value) {
