@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import { DateTime } from 'luxon'
 import testUtils from '@adonisjs/core/services/test_utils'
 import mail from '@adonisjs/mail/services/main'
 import BookingStatus from '#enums/booking_status'
@@ -67,6 +68,29 @@ test.group('Bookings API', (group) => {
     const bookings = response.body().data
     assert.lengthOf(bookings, 1)
     assert.equal(bookings[0].status, BookingStatus.COMPLETED)
+  })
+
+  test('GET /bookings lists the latest created booking first', async ({ client, assert }) => {
+    const customer = await createUser({ role: UserRole.USER })
+    const earlier = await createBooking({
+      client: customer,
+      service: 'Earlier request',
+      scheduledAt: DateTime.now().plus({ days: 10 }),
+    })
+    const later = await createBooking({
+      client: customer,
+      service: 'Later request',
+      scheduledAt: DateTime.now().plus({ days: 1 }),
+    })
+
+    const token = await issueToken(customer)
+    const response = await client.get('/api/v1/bookings').bearerToken(token)
+
+    response.assertStatus(200)
+    assert.deepEqual(
+      response.body().data.map((booking: { id: number }) => booking.id),
+      [later.id, earlier.id]
+    )
   })
 
   test('GET /bookings never returns another client bookings', async ({ client, assert }) => {

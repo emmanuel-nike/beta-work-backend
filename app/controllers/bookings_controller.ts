@@ -8,7 +8,7 @@ import { createBookingValidator, updateBookingValidator } from '#validators/book
 
 export default class BookingsController {
   /**
-   * List the authenticated client's bookings, newest scheduled first. Supports
+   * List the authenticated client's bookings, latest created first. Supports
    * an optional `?status=` filter matching the booking status enum.
    */
   async index({ auth, request, response }: HttpContext) {
@@ -37,7 +37,7 @@ export default class BookingsController {
   }
 
   /**
-   * List bookings assigned to the authenticated artisan, newest scheduled first.
+   * List bookings assigned to the authenticated artisan, latest created first.
    * The caller must have the artisan role (enforced on the route).
    */
   async jobs({ auth, response }: HttpContext) {
