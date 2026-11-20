@@ -45,13 +45,13 @@ export interface UpdateBookingInput {
  * {@link BookingException}, which carries the HTTP status.
  */
 export default class BookingService {
-  /** The authenticated client's bookings, newest scheduled first. */
+  /** The authenticated client's bookings, latest created first. */
   static listForClient(client: User, status?: string | null): Promise<Booking[]> {
     const query = Booking.query()
       .where('clientId', client.id)
       .preload('artisan', (artisanQuery) => artisanQuery.preload('artisanProfile'))
-      .orderBy('scheduledAt', 'desc')
       .orderBy('createdAt', 'desc')
+      .orderBy('id', 'desc')
 
     if (status && BOOKING_STATUSES.includes(status)) {
       query.where('status', status)
@@ -60,13 +60,13 @@ export default class BookingService {
     return query
   }
 
-  /** Bookings assigned to the authenticated artisan, newest scheduled first. */
+  /** Bookings assigned to the authenticated artisan, latest created first. */
   static listForArtisan(artisan: User): Promise<Booking[]> {
     return Booking.query()
       .where('artisanId', artisan.id)
       .preload('client')
-      .orderBy('scheduledAt', 'desc')
       .orderBy('createdAt', 'desc')
+      .orderBy('id', 'desc')
   }
 
   /** A single booking assigned to the artisan, or null. */

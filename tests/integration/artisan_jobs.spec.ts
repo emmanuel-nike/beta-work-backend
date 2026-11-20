@@ -1,4 +1,5 @@
 import { test } from '@japa/runner'
+import { DateTime } from 'luxon'
 import testUtils from '@adonisjs/core/services/test_utils'
 import mail from '@adonisjs/mail/services/main'
 import BookingStatus from '#enums/booking_status'
@@ -57,6 +58,30 @@ test.group('Artisan jobs API', (group) => {
     assert.equal(jobs[0].client.name, 'Funke Adebayo')
     assert.equal(jobs[0].client.phone, '+2348012345678')
     assert.isNumber(jobs[0].distanceKm)
+  })
+
+  test('GET /artisan/jobs lists the latest created job first', async ({ client, assert }) => {
+    const { user: artisan } = await createArtisan()
+    const earlier = await createBooking({
+      artisan,
+      service: 'Earlier request',
+      scheduledAt: DateTime.now().plus({ days: 10 }),
+    })
+    const later = await createBooking({
+      artisan,
+      service: 'Later request',
+      scheduledAt: DateTime.now().plus({ days: 1 }),
+    })
+
+    const token = await issueToken(artisan)
+    const response = await client.get('/api/v1/artisan/jobs').bearerToken(token)
+
+    response.assertStatus(200)
+    const jobs = response.body().data
+    assert.deepEqual(
+      jobs.map((job: { id: number }) => job.id),
+      [later.id, earlier.id]
+    )
   })
 
   test('GET /artisan/jobs never returns another artisan jobs', async ({ client, assert }) => {
