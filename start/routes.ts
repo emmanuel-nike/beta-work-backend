@@ -16,6 +16,7 @@ const ArtisanProfilesController = () => import('#controllers/artisan_profiles_co
 const BookingsController = () => import('#controllers/bookings_controller')
 const GeocodingController = () => import('#controllers/geocoding_controller')
 const AddressesController = () => import('#controllers/addresses_controller')
+const DevicesController = () => import('#controllers/devices_controller')
 const AdminUsersController = () => import('#controllers/admin/users_controller')
 const AdminArtisansController = () => import('#controllers/admin/artisans_controller')
 
@@ -50,6 +51,10 @@ router
         router.get('/bookings/:id', [BookingsController, 'show'])
         router.patch('/bookings/:id', [BookingsController, 'update'])
         router.post('/bookings/:id/complete', [BookingsController, 'complete'])
+
+        // Push-notification device registration.
+        router.post('/devices', [DevicesController, 'register'])
+        router.delete('/devices/:token', [DevicesController, 'unregister'])
 
         router.get('/geocoding/autocomplete', [GeocodingController, 'autocomplete'])
         router.get('/geocoding/place/:placeId', [GeocodingController, 'place'])

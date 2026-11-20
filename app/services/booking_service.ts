@@ -5,6 +5,7 @@ import ArtisanProfile from '#models/artisan_profile'
 import Booking from '#models/booking'
 import User from '#models/user'
 import BookingException from '#exceptions/booking_exception'
+import NotificationService from '#services/notification_service'
 
 const BOOKING_STATUSES = Object.values(BookingStatus) as string[]
 
@@ -81,6 +82,8 @@ export default class BookingService {
     const booking = await this.requirePendingJob(artisan, id)
     booking.status = BookingStatus.ACCEPTED
     await booking.save()
+    // Notify the client (push + email + live SSE); best-effort, non-blocking.
+    await NotificationService.bookingAccepted(booking)
     return booking
   }
 
@@ -99,6 +102,7 @@ export default class BookingService {
     booking.cancellationReason = reason?.trim() || 'Declined by the artisan'
     booking.cancelledAt = DateTime.now()
     await booking.save()
+    await NotificationService.bookingDeclined(booking)
     return booking
   }
 
@@ -164,6 +168,8 @@ export default class BookingService {
     })
 
     await booking.load('artisan', (artisanQuery) => artisanQuery.preload('artisanProfile'))
+    // Notify the artisan of the new request.
+    await NotificationService.bookingRequested(booking)
     return booking
   }
 
@@ -240,6 +246,8 @@ export default class BookingService {
     booking.status = BookingStatus.COMPLETED
     booking.awaitingConfirmation = false
     await booking.save()
+    // Notify the artisan that the client confirmed completion.
+    await NotificationService.bookingCompleted(booking)
     return booking
   }
 

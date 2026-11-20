@@ -55,4 +55,17 @@ export default await Env.create(new URL('../', import.meta.url), {
   | when it is not set. Enable the Places API (New) + Geocoding API for this key.
   */
   GOOGLE_MAPS_API_KEY: Env.schema.string.optional(),
+
+  /*
+  |----------------------------------------------------------
+  | Firebase Cloud Messaging (push notifications)
+  |----------------------------------------------------------
+  | Service-account credentials for the Firebase Admin SDK. All optional so the
+  | app boots (and tests run) without them; push delivery becomes a logged
+  | no-op until they are set. FIREBASE_PRIVATE_KEY is the PEM with newlines
+  | escaped as literal "\n" on a single line.
+  */
+  FIREBASE_PROJECT_ID: Env.schema.string.optional(),
+  FIREBASE_CLIENT_EMAIL: Env.schema.string.optional(),
+  FIREBASE_PRIVATE_KEY: Env.schema.string.optional(),
 })
