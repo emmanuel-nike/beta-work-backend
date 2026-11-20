@@ -28,6 +28,32 @@ export default class MailerService {
     })
   }
 
+  /**
+   * Event notification email (booking requested/accepted/completed, etc.).
+   * Queued with `sendLater` so a slow SMTP server never delays the API request
+   * that triggered it; delivery stays best-effort.
+   */
+  static async queueNotificationEmail(
+    email: string,
+    subject: string,
+    data: { heading: string; message: string; details?: string | null }
+  ) {
+    try {
+      await mail.sendLater((message) => {
+        message
+          .to(email)
+          .subject(subject)
+          .htmlView('emails/notification', {
+            heading: data.heading,
+            message: data.message,
+            details: data.details ?? null,
+          })
+      })
+    } catch (error) {
+      logger.error({ err: error, to: email }, 'Failed to queue notification email')
+    }
+  }
+
   private static async safeSend(
     to: string,
     subject: string,

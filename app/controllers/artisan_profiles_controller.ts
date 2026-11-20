@@ -80,12 +80,14 @@ export default class ArtisanProfilesController {
         const paginated = await query.orderBy('created_at', 'desc').paginate(page, limit)
         const serialized = paginated.serialize()
         // Public listing only: drop identity documents and guarantor details.
-        serialized.data = paginated.all().map((profile) =>
-          this.toPublicArtisan(
-            profile,
-            ArtisanLocationService.placeholderDistanceKm(profile.userId)
+        serialized.data = paginated
+          .all()
+          .map((profile) =>
+            this.toPublicArtisan(
+              profile,
+              ArtisanLocationService.placeholderDistanceKm(profile.userId)
+            )
           )
-        )
         return serialized
       },
     })

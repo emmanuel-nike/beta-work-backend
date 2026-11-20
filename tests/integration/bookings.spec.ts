@@ -1,5 +1,6 @@
 import { test } from '@japa/runner'
 import testUtils from '@adonisjs/core/services/test_utils'
+import mail from '@adonisjs/mail/services/main'
 import BookingStatus from '#enums/booking_status'
 import UserRole from '#enums/user_role'
 import User from '#models/user'
@@ -7,6 +8,12 @@ import { createArtisan, createBooking, createUser } from '#tests/helpers'
 
 test.group('Bookings API', (group) => {
   group.each.setup(() => testUtils.db().withGlobalTransaction())
+
+  // Booking actions dispatch notification emails; keep them off real SMTP.
+  group.each.setup(() => {
+    mail.fake()
+    return () => mail.restore()
+  })
 
   test('GET /bookings requires authentication', async ({ client }) => {
     const response = await client.get('/api/v1/bookings')
